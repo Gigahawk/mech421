@@ -1,0 +1,499 @@
+#+TITLE: MECH 421 Assignment 1
+#+AUTHOR: Jasper Chan - 37467164
+
+#+OPTIONS: toc:nil
+
+#+LATEX_HEADER: \definecolor{bg}{rgb}{0.95,0.95,0.95}
+#+LATEX_HEADER: \setminted{frame=single,bgcolor=bg,samepage=true}
+#+LATEX_HEADER: \setlength{\parindent}{0pt}
+#+LATEX_HEADER: \usepackage{float}
+#+LATEX_HEADER: \usepackage{svg}
+#+LATEX_HEADER: \usepackage{cancel}
+#+LATEX_HEADER: \usepackage{amssymb}
+#+LATEX_HEADER: \usepackage{mathtools, nccmath}
+#+LATEX_HEADER: \sisetup{per-mode=fraction}
+#+LATEX_HEADER: \newcommand{\Lwrap}[1]{\left\{#1\right\}}
+#+LATEX_HEADER: \newcommand{\Lagr}[1]{\mathcal{L}\Lwrap{#1}}
+#+LATEX_HEADER: \newcommand{\Lagri}[1]{\mathcal{L}^{-1}\Lwrap{#1}}
+#+LATEX_HEADER: \newcommand{\Ztrans}[1]{\mathcal{Z}\Lwrap{#1}}
+#+LATEX_HEADER: \newcommand{\Ztransi}[1]{\mathcal{Z}^{-1}\Lwrap{#1}}
+#+LATEX_HEADER: \newcommand{\ZOH}[1]{\text{ZOH}\left(#1\right)}
+#+LATEX_HEADER: \DeclarePairedDelimiter{\ceil}{\lceil}{\rceil}
+#+LATEX_HEADER: \makeatletter \AtBeginEnvironment{minted}{\dontdofcolorbox} \def\dontdofcolorbox{\renewcommand\fcolorbox[4][]{##4}} \makeatother
+
+#+LATEX_HEADER: \renewcommand\arraystretch{1.2}
+
+#+begin_src ipython :session :results none :exports none
+import numpy as np
+import pandas as pd
+from matplotlib import pyplot as plt
+from IPython.display import set_matplotlib_formats
+%matplotlib inline
+set_matplotlib_formats('svg')
+#+end_src
+#+begin_src ipython :session :results none :exports none
+import IPython
+from tabulate import tabulate
+
+class OrgFormatter(IPython.core.formatters.BaseFormatter):
+    def __call__(self, obj):
+        if(isinstance(obj, str)):
+            return None
+        if(isinstance(obj, pd.core.indexes.base.Index)):
+            return None
+        try:
+            return tabulate(obj, headers='keys',
+                            tablefmt='orgtbl', showindex='always')
+        except:
+            return None
+
+ip = get_ipython()
+ip.display_formatter.formatters['text/org'] = OrgFormatter()
+#+end_src
+* Problem 1
+Manually draw the step response and Bode plot of the following transfer functions.
+For the step responses, clearly show the first-order time constants (if exist), and the initial response and steady state response.
+For the Bode plots, clearly show the break frequencies (if exist) and asymptotes for the gain and phase curves, and make the transistion between the asymptotes properly.
+** $H(s) = s$
+*** Step Response
+First let's find the response in the Laplace domain:
+\begin{align*}
+H(s) &= \frac{Y(s)}{X(s)} \\
+Y(s) &= X(s)H(s) = \underbrace{\frac{1}{s}}_{\text{step input}} s \\
+&= 1
+\end{align*}
+
+We can then get the time domain response by taking the inverse Laplace transform:
+\begin{align*}
+y(t) &= \Lagri{Y(s)} = \Lagri{1} \\
+&= \delta(t)
+\end{align*}
+
+TODO: place image here
+*** Bode Plot
+Given a transfer function of the form:
+\begin{align*}
+G(s) &= K \frac
+{(s + z_1)(s + z_2)...(s + z_m)}
+{(s + p_1)(s + p_2)...(s + p_n)}
+\end{align*}
+The frequency response can be evaluated buy providing an input $j\omega$ to the system.
+The resultant magnitude and phase lag is given by:
+\begin{align*}
+|G(j\omega)| &= 
+K \frac
+{\sqrt{\omega^2 + z_1^2}\sqrt{\omega^2 + z_2^2}...\sqrt{\omega^2 + z_m^2}}
+{\sqrt{\omega^2 + p_1^2}\sqrt{\omega^2 + p_2^2}...\sqrt{\omega^2 + p_n^2}} \\
+\angle G(j\omega) &=
+\left(\tan^{-1}\frac{\omega}{z_1} + \tan^{-1}\frac{\omega}{z_2} + ... + \tan^{-1}\frac{\omega}{z_m}\right)
+- \left(\tan^{-1}\frac{\omega}{p_1} + \tan^{-1}\frac{\omega}{p_2} + ... + \tan^{-1}\frac{\omega}{p_n}\right)
+\end{align*}
+
+For our given transfer function, we get:
+\begin{align*}
+|H(j\omega)| &= \frac{\sqrt{\omega^2}}{1} = \omega \\
+\angle H(j\omega) &= \tan^{-1}\frac{\omega}{0} = \SI{90}{\degree}
+\end{align*}
+
+TODO: Add image here
+
+** $H(s) = s + \omega_o$ \hspace{0.7cm} $(\omega_o > 0)$
+*** Step Response
+\begin{align*}
+H(s) &= \frac{Y(s)}{X(s)} \\
+Y(s) &= X(s)H(s) = \frac{1}{s} (s + \omega_o) \\
+&= 1 + \frac{\omega_o}{s} \\
+\\
+y(t) &= \Lagri{Y(s)} = \Lagri{1 + \frac{\omega_o}{s}} \\
+&= \delta(t) + \omega_o
+\end{align*}
+
+TODO: Add image here
+
+*** Bode Plot
+For our given transfer function, we get:
+\begin{align*}
+|H(j\omega)| &= \frac{\sqrt{\omega^2 + \omega_o^2}}{1} = \sqrt{\omega^2 + \omega_o^2}\\
+\angle H(j\omega) &= \tan^{-1}\frac{\omega}{\omega_o}
+\end{align*}
+
+TODO: Add image here
+** $H(s) = \dfrac{1}{s}$
+*** Step Response
+\begin{align*}
+H(s) &= \frac{Y(s)}{X(s)} \\
+Y(s) &= X(s)H(s) = \frac{1}{s} \frac{1}{s} \\
+&= \frac{1}{s^2} \\
+\\
+y(t) &= \Lagri{Y(s)} = \Lagri{\frac{1}{s^2}} \\
+&= t
+\end{align*}
+
+
+TODO: Add image here
+*** Bode Plot
+For our given transfer function, we get:
+\begin{align*}
+|H(j\omega)| &= \frac{1}{\sqrt{\omega^2 + 0^2}} = \frac{1}{\omega} \\
+\angle H(j\omega) &= - \tan^{-1}\frac{\omega}{0} = \SI{-90}{\degree}
+\end{align*}
+** $H(s) = \dfrac{\omega_o}{s} + 1$ \hspace{0.7cm} $(\omega_o > 0)$
+*** Step Response
+\begin{align*}
+H(s) &= \frac{Y(s)}{X(s)} \\
+Y(s) &= X(s)H(s) = \frac{1}{s} \left(\frac{\omega_o}{s} + 1\right) \\
+&= \frac{\omega_o}{s^2} + \frac{1}{s} \\
+\\
+y(t) &= \Lagri{Y(s)} = \Lagri{\frac{\omega_o}{s^2} + \frac{1}{s}} \\
+&= \omega_o t + 1
+\end{align*}
+
+
+TODO: Add image here
+*** Bode Plot
+\begin{align*}
+H(s) &= \dfrac{\omega_o}{s} + 1 \\
+&= \frac{\omega_o}{s} + \frac{s}{s} = \frac{s + \omega_o}{s}
+\end{align*}
+For our given transfer function, we get:
+\begin{align*}
+|H(j\omega)| &= \frac{\sqrt{\omega^2 + \omega_o^2}}{\sqrt{\omega^2 + 0^2}} = \frac{\sqrt{\omega^2 + \omega_o^2}}{\omega}\\
+\angle H(j\omega) &= \tan^{-1} \frac{\omega}{\omega_o} - \tan^{-1}\frac{\omega}{0} = \tan^{-1} \frac{\omega}{\omega_o} - \SI{90}{\degree}
+\end{align*}
+
+TODO: Add image here
+
+** $H(s) = \dfrac{\alpha \tau s + 1}{\tau s + 1}$ \hspace{0.7cm} $(\alpha = 100, \tau > 0)$
+*** Step Response
+\begin{align*}
+H(s) &= \frac{Y(s)}{X(s)} \\
+Y(s) &= X(s)H(s) = \frac{1}{s} \left(\frac{\alpha \tau s + 1}{\tau s + 1}\right) \\
+&= \frac{\alpha \tau s + 1}{s(\tau s + 1)} \\
+\end{align*}
+Doing a partial fraction expansion:
+\begin{align*}
+Y(s) &= \frac{\alpha \tau s + 1}{s(\tau s + 1)} = \frac{A}{s} + \frac{B}{\tau s + 1}\\
+A &= \lim_{s \to 0} sY(s) = \lim_{s \to 0} \frac{\alpha \tau s + 1}{\tau s + 1} = 1 \\
+B &= \lim_{s \to -\frac{1}{\tau}} (\tau s + 1)Y(s) = \lim_{s \to -\frac{1}{\tau}} \frac{\alpha \tau s + 1}{s} = -\tau(-\alpha + 1) \\
+Y(s) &= \frac{1}{s} - \frac{\tau(-\alpha + 1)}{\tau s + 1} \\
+&= \frac{1}{s} + \frac{\alpha - 1}{s + \frac{1}{\tau}}
+\end{align*}
+
+Applying an inverse Laplace Transform:
+\begin{align*}
+y(t) &= \Lagri{Y(s)} = \Lagri{\frac{1}{s} + \frac{\alpha - 1}{s + \frac{1}{\tau}}
+} \\
+&= 1 + (\alpha - 1)e^{-\frac{t}{\tau}}
+\end{align*}
+
+
+TODO: Add image here
+*** Bode Plot
+\begin{align*}
+H(s) &= \frac{\alpha \tau s + 1}{\tau s + 1} \\
+&= \frac{\alpha s + \frac{1}{\tau}}{s + \frac{1}{\tau}} \\
+&= \alpha \frac{s + \frac{1}{\tau \alpha}}{s + \frac{1}{\tau}}
+\end{align*}
+For our given transfer function, we get:
+\begin{align*}
+|H(j\omega)| &= \alpha \frac{\sqrt{\omega^2 + \frac{1}{(\tau\alpha)^2}}}{\sqrt{\omega^2 + \frac{1}{\tau^2}}} \\
+\angle H(j\omega) &= \tan^{-1} (\tau\alpha\omega) - \tan^{-1}(\tau \omega) 
+\end{align*}
+
+Note: $H(s)$ describes a lead compensator, where:
+\begin{align*}
+\omega_m &= \frac{1}{\tau \sqrt{\alpha}} &&:= \text{Middle frequency (frequency of max added phase)} \\
+\omega_{c1} &= \frac{1}{\tau \alpha} &&:= \text{Lower corner frequency (frequency where gain starts to increase)} \\
+\omega_{c2} &= \frac{1}{\tau} &&:= \text{Upper corner frequency (frequency where gain approaches $\alpha$)} \\
+\phi &= \sin^{-1}\frac{\alpha - 1}{\alpha + 1} &&:= \text{Max added phase at $\omega_m$} \\
+\end{align*}
+
+TODO: Add image here:
+** $H(s) = \dfrac{\tau s + 1}{\alpha\tau s + 1}$ \hspace{0.7cm} $(\alpha = 100, \tau > 0)$
+*** Step Response
+\begin{align*}
+H(s) &= \frac{Y(s)}{X(s)} \\
+Y(s) &= X(s)H(s) = \frac{1}{s} \left(\frac{\tau s + 1}{\alpha \tau s + 1}\right) \\
+&= \frac{\tau s + 1}{s(\alpha \tau s + 1)} \\
+\end{align*}
+Doing a partial fraction expansion:
+\begin{align*}
+Y(s) &= \frac{\tau s + 1}{s(\alpha\tau s + 1)} = \frac{A}{s} + \frac{B}{\alpha \tau s + 1}\\
+A &= \lim_{s \to 0} sY(s) = \lim_{s \to 0} \frac{\tau s + 1}{\alpha \tau s + 1} = 1 \\
+B &= \lim_{s \to -\frac{1}{\alpha \tau}} (\alpha \tau s + 1)Y(s) = \lim_{s \to -\frac{1}{\alpha \tau}} \frac{\tau s + 1}{s} = -\alpha\tau(-\frac{1}{\alpha} + 1) \\
+Y(s) &= \frac{1}{s} - \frac{\alpha\tau(-\frac{1}{\alpha} + 1)}{\alpha \tau s + 1} \\
+&= \frac{1}{s} + \frac{\frac{1}{\alpha} - 1}{s + \frac{1}{\alpha\tau}}
+\end{align*}
+
+Applying an inverse Laplace Transform:
+\begin{align*}
+y(t) &= \Lagri{Y(s)} = \Lagri{\frac{1}{s} + \frac{\frac{1}{\alpha} - 1}{s + \frac{1}{\alpha\tau}}} \\
+&= 1 + \left(\frac{1}{\alpha} - 1\right)e^{-\frac{t}{\alpha\tau}}
+\end{align*}
+
+
+TODO: Add image here
+*** Bode Plot
+\begin{align*}
+H(s) &= \frac{\tau s + 1}{\alpha \tau s + 1} \\
+&= \frac{\frac{1}{\alpha} s + \frac{1}{\alpha\tau}}{s + \frac{1}{\alpha\tau}} \\
+&= \frac{1}{\alpha} \frac{s + \frac{1}{\tau}}{s + \frac{1}{\alpha\tau}}
+\end{align*}
+For our given transfer function, we get:
+\begin{align*}
+|H(j\omega)| &= \frac{1}{\alpha} \frac{\sqrt{\omega^2 + \frac{1}{\tau^2}}}{\sqrt{\omega^2 + \frac{1}{(\alpha\tau)^2}}} \\
+\angle H(j\omega) &= \tan^{-1} (\tau \omega) - \tan^{-1}(\alpha \tau \omega) 
+\end{align*}
+
+Note: $H(s)$ describes a lag compensator, where:
+\begin{align*}
+\omega_m &= \frac{1}{\tau \sqrt{\alpha}} &&:= \text{Middle frequency (frequency of max subtracted phase)} \\
+\omega_{c1} &= \frac{1}{\tau \alpha} &&:= \text{Lower corner frequency (frequency where gain starts to decrease)} \\
+\omega_{c2} &= \frac{1}{\tau} &&:= \text{Upper corner frequency (frequency where gain approaches $\frac{1}{\alpha}$)} \\
+\phi &= \sin^{-1}\frac{\alpha - 1}{\alpha + 1} &&:= \text{Max subtracted phase at $\omega_m$} \\
+\end{align*}
+
+TODO: Add image here
+
+* Problem 2
+For the following transfer function:
+\begin{equation*}
+H(s) = \frac{1}{0.01s + 1}
+\end{equation*}
+** Manually draw the Bode plot of $H(s)$
+\begin{align*}
+H(s) &= \frac{1}{0.01s + 1} \\
+&= \frac{100}{s + 100}
+\end{align*}
+For our given transfer function, we get:
+\begin{align*}
+|H(j\omega)| &= 100 \frac{1}{\sqrt{\omega^2 + 100^2}} \\
+\angle H(j\omega) &= - \tan^{-1}\frac{\omega}{100}
+\end{align*}
+
+TODO: Add image here
+** Find the response $y(t)$ to an input sinusoid $x(t) = \sin(10t + \pi/3)$
+<<sec:resp_deriv>>
+Input $x(t)$ is of the form $\sin(at + b)$, so the Laplace transform gives:
+\begin{equation*}
+X(s) = \frac{\overbrace{\sin(b)}^{A}s + \overbrace{a\cos(b)}^{B}}{s^2 + a^2}
+\end{equation*}
+Multiplying by $H(s)$ to get $Y(s)$:
+\begin{align*}
+Y(s) &= H(s) X(s) \\
+&= \frac{100(As + B)}{(s + 100)(s^2 + a^2)}
+\end{align*}
+Doing the partial fraction expansion:
+\begin{align*}
+Y(s) &= \frac{100(As + B)}{(s + 100)(s^2 + a^2)} = \frac{C}{s + 100} + \frac{Ds + E}{s^2 + a^2}
+\end{align*}
+Solving for $C$:
+\begin{align*}
+C &= \lim_{s \to -100} (s + 100)Y(s) = \lim_{s \to -100} \frac{100(As + B)}{s^2 + a^2} = \frac{100(-100A + B)}{100^2 + a^2}\\
+\end{align*}
+Solving for $D$ and $E$ by cross multiplying:
+\begin{align*}
+\frac{100(As + B)}{(s + 100)(s^2 + a^2)} &= \frac{C}{s + 100} + \frac{Ds + E}{s^2 + a^2} \\
+0s^2 + 100As + 100B &= C(s^2 + a^2) + (Ds + E)(s + 100) \\
+0s^2 + 100As + 100B &= (C + D)s^2 + (100D + E)s + (Ca^2 + 100E)\\
+\\
+C + D = 0 \to D &= -C \\
+100A = 100D + E \to E &= 100(A + C)
+\end{align*}
+Doing the inverse Laplace Transform:
+\begin{align*}
+y(t) &= \Lagri{\frac{C}{s + 100} + \frac{Ds}{s^2 + a^2} + \frac{E}{s^2 + a^2}} \\
+&= \Lagri{C\frac{1}{s - (-100)} + D\frac{s}{s^2 + a^2} + \frac{E}{a}\frac{a}{s^2 + a^2}} \\
+&= Ce^{-100t} + D\cos(at) + \frac{E}{a}\sin(at)
+\end{align*}
+Note that this answer assumes zero initial conditions.
+If the input signal exists for all time, then by $t = 0$, the response will have had infinite time $t \in (-\infty, 0)$ to reach steady state, hence the transient term will disappear.
+\begin{align*}
+y_\text{ss}(t) &= D\cos(at) + \frac{E}{a}\sin(at)
+\end{align*}
+
+Getting numerical values for our coefficients:
+#+begin_src ipython :session :results raw drawer :exports both
+def calc_coeffs(a, b):
+    A = np.sin(b)
+    B = a*np.cos(b)
+    C = 100*(-100*A + B)/(100**2 + a**2)
+    D = -C
+    E = 100*(A + C)
+    return A, B, C, D, E
+a = 10
+b = np.pi/3
+A, B, C, D, E = calc_coeffs(a, b)
+A, B, C, D, E
+#+end_src
+
+#+RESULTS:
+:results:
+# Out[177]:
+#+BEGIN_EXAMPLE
+  (0.8660254037844386,
+  5.000000000000001,
+  -0.8079459443410284,
+  0.8079459443410284,
+  5.80794594434102)
+#+END_EXAMPLE
+:end:
+
+Plotting our results:
+#+begin_src ipython :session :results raw drawer :exports both
+def plot_results(t_max, n=1000):
+    t = np.linspace(0, t_max, n)
+    x = np.sin(a*t + b)
+    y = C*np.exp(-100*t) + D*np.cos(a*t) + E/a*np.sin(a*t)
+    y_ss = D*np.cos(a*t) + E/a*np.sin(a*t)
+    plt.plot(t, x, label="x(t)")
+    plt.plot(t, y, '--', label="y(t)")
+    plt.plot(t, y_ss, label="$y_{ss}(t)$")
+    plt.legend()
+    plt.xlabel("Time (s)")
+    plt.ylabel("Response")
+plot_results(1)
+#+end_src
+
+#+RESULTS:
+:results:
+# Out[178]:
+[[file:./obipy-resources/0GguLE.svg]]
+:end:
+** Find the response $y(t)$ to an input sinusoid $x(t) = \sin(100t + 2\pi/3)$
+Using the results from Section [[sec:resp_deriv]]:
+#+begin_src ipython :session :results raw drawer :exports both
+a = 100
+b = 2*np.pi/3
+A, B, C, D, E = calc_coeffs(a, b)
+A, B, C, D, E
+#+end_src
+
+#+RESULTS:
+:results:
+# Out[155]:
+#+BEGIN_EXAMPLE
+  (0.8660254037844387,
+  -49.99999999999998,
+  -0.6830127018922192,
+  0.6830127018922192,
+  18.301270189221952)
+#+END_EXAMPLE
+:end:
+
+Plotting our results:
+#+begin_src ipython :session :results raw drawer :exports both
+plot_results(0.15)
+#+end_src
+
+#+RESULTS:
+:results:
+# Out[156]:
+[[file:./obipy-resources/nWT8xO.svg]]
+:end:
+
+** Find the response $y(t)$ to an input sinusoid $x(t) = \sin(1000t + \pi)$
+Using the results from Section [[sec:resp_deriv]]:
+#+begin_src ipython :session :results raw drawer :exports both
+a = 1000
+b = np.pi
+A, B, C, D, E = calc_coeffs(a, b)
+A, B, C, D, E
+#+end_src
+
+#+RESULTS:
+:results:
+# Out[157]:
+#+BEGIN_EXAMPLE
+  (1.2246467991473532e-16,
+  -1000.0,
+  -0.09900990099009901,
+  0.09900990099009901,
+  -9.900990099009888)
+#+END_EXAMPLE
+:end:
+
+Plotting our results:
+#+begin_src ipython :session :results raw drawer :exports both
+plot_results(0.040)
+#+end_src
+
+#+RESULTS:
+:results:
+# Out[160]:
+[[file:./obipy-resources/fOzeVi.svg]]
+:end:
+
+* Problem 3
+Manually draw the Bode plot of the following transfer functions.
+Clearly show the break frequencies (if exist) and asymptotes for the gain and phase curves, and make the transition between the asymptotes properly.
+Make sure the starting point of the Bode phase curve, i.e $\angle H (j\omega)|_{\omega \to 0}$, is within $\pm\SI{180}{\degree}$ by adding or subtracting an integer multiple of \SI{360}{\degree}
+** $H(s) = \dfrac{1}{0.1s + 1}$
+\begin{align*}
+H(s) &= \frac{1}{0.1s + 1} \\
+&= \frac{10}{s + 10}
+\end{align*}
+For our given transfer function, we get:
+\begin{align*}
+|H(j\omega)| &= 10 \frac{1}{\sqrt{\omega^2 + 10^2}} \\
+\angle H(j\omega) &= - \tan^{-1}\frac{\omega}{10}
+\end{align*}
+
+TODO: Add image here
+** $H(s) = \dfrac{1}{s + 0.1}$
+For our given transfer function, we get:
+\begin{align*}
+|H(j\omega)| &= \frac{1}{\sqrt{\omega^2 + 0.1^2}} \\
+\angle H(j\omega) &= - \tan^{-1}\frac{\omega}{0.1}
+\end{align*}
+
+TODO: Add image here
+** $H(s) = \dfrac{1 - 0.1s}{1 + 0.1s}$
+\begin{align*}
+H(s) &= \frac{1 - 0.1s}{1 + 0.1s} \\
+&= \frac{-s + 10}{s + 10} \\
+&= -\frac{s - 10}{s + 10} 
+\end{align*}
+For transfer functions with positive poles or zeros (here $H(s)$ has a positive zero at $s = +10$), the phase can be more easily seen by putting it in the form:
+\begin{equation*}
+G(s) = K \frac{(1 + s/a_1)(1 + s/a_2)...(1 + s/a_m)}{(1 + s/b_1)(1 + s/b_2)...(1 + s/b_n)}
+\end{equation*}
+The phase is then:
+\begin{equation*}
+\angle G(j\omega) = 
+\left(\tan^{-1}\frac{\omega}{a_1} + \tan^{-1}\frac{\omega}{a_2} + ... + \tan^{-1}\frac{\omega}{a_m}\right)
+- \left(\tan^{-1}\frac{\omega}{b_1} + \tan^{-1}\frac{\omega}{b_2} + ... + \tan^{-1}\frac{\omega}{b_n}\right)
+\end{equation*}
+\begin{align*}
+H(s) &= \frac{1 - 0.1s}{1 + 0.1s} \\
+&= \frac{1 - s/10}{1 + s/10} \\
+\end{align*}
+For transfer functions with positive poles or zeros (here $H(s)$ has a positive zero at $s = +10$), the phase can be more easily seen by putting it in the form:
+For our given transfer function, we get:
+\begin{align*}
+|H(j\omega)| &= \frac{\sqrt{\omega^2 + 10^2}}{\sqrt{\omega^2 + 10^2}} = 1 \\
+\angle H(j\omega) &= \tan^{-1}\frac{\omega}{-10} - \tan^{-1}\frac{\omega}{10} \\
+&= 2\tan^{-1}\frac{\omega}{10}
+\end{align*}
+
+TODO: Add image here
+** $H(s) = \left(\dfrac{1}{s + 0.1}\right)\left(\dfrac{1 - 0.1s}{1 + 0.1s}\right)$
+\begin{align*}
+H(s) &= \left(\dfrac{1}{s + 0.1}\right)\left(\dfrac{1 - 0.1s}{1 + 0.1s}\right) \\
+&= \frac{1 - 0.1s}{(s + 0.1)(1 + 0.1s)} \\
+&= \frac{-s + 10}{(s + 0.1)(s + 10)} \\
+&= - \frac{s - 10}{(s + 0.1)(s + 10)}
+\end{align*}
+\begin{align*}
+H(s) &= \frac{1 - 0.1s}{(s + 0.1)(1 + 0.1s)} \\
+&= \frac{(1 - s/10)}{\frac{1}{10}(1 + s/0.1)(1 + s/10)} \\
+&= 10\frac{(1 - s/10)}{(1 + s/0.1)(1 + s/10)}
+\end{align*}
+For our given transfer function, we get:
+\begin{align*}
+|H(j\omega)| &= \frac{\sqrt{\omega^2 + 10^2}}{\sqrt{\omega^2 + 0.1^2}\sqrt{\omega^2 + 10^2}} \\
+&= \frac{1}{\sqrt{\omega^2 + 0.1^2}} \\
+\angle H(j\omega) &= \tan^{-1}\frac{\omega}{-10} - \tan^{-1}\frac{\omega}{0.1} - \tan^{-1}\frac{\omega}{10} \\
+&= - \tan^{-1}\frac{\omega}{0.1} - 2\tan^{-1}\frac{\omega}{10}
+\end{align*}
+TODO: Add image here
