@@ -69,7 +69,9 @@ y(t) &= \Lagri{Y(s)} = \Lagri{1} \\
 &= \delta(t)
 \end{align*}
 
-TODO: place image here
+#+ATTR_LATEX: :placement [H] :width 0.4\textwidth
+[[file:1.1.1.svg]]
+
 *** Bode Plot
 Given a transfer function of the form:
 \begin{align*}
@@ -77,7 +79,7 @@ G(s) &= K \frac
 {(s + z_1)(s + z_2)...(s + z_m)}
 {(s + p_1)(s + p_2)...(s + p_n)}
 \end{align*}
-The frequency response can be evaluated buy providing an input $j\omega$ to the system.
+The frequency response can be evaluated by providing an input $j\omega$ to the system.
 The resultant magnitude and phase lag is given by:
 \begin{align*}
 |G(j\omega)| &= 
@@ -95,7 +97,8 @@ For our given transfer function, we get:
 \angle H(j\omega) &= \tan^{-1}\frac{\omega}{0} = \SI{90}{\degree}
 \end{align*}
 
-TODO: Add image here
+#+ATTR_LATEX: :placement [H] :width 0.4\textwidth
+[[file:1.1.2.svg]]
 
 ** $H(s) = s + \omega_o$ \hspace{0.7cm} $(\omega_o > 0)$
 *** Step Response
@@ -108,7 +111,8 @@ y(t) &= \Lagri{Y(s)} = \Lagri{1 + \frac{\omega_o}{s}} \\
 &= \delta(t) + \omega_o
 \end{align*}
 
-TODO: Add image here
+#+ATTR_LATEX: :placement [H] :width 0.4\textwidth
+[[file:1.2.1.svg]]
 
 *** Bode Plot
 For our given transfer function, we get:
@@ -117,7 +121,8 @@ For our given transfer function, we get:
 \angle H(j\omega) &= \tan^{-1}\frac{\omega}{\omega_o}
 \end{align*}
 
-TODO: Add image here
+#+ATTR_LATEX: :placement [H] :width 0.7\textwidth
+[[file:1.2.2.svg]]
 ** $H(s) = \dfrac{1}{s}$
 *** Step Response
 \begin{align*}
@@ -130,13 +135,16 @@ y(t) &= \Lagri{Y(s)} = \Lagri{\frac{1}{s^2}} \\
 \end{align*}
 
 
-TODO: Add image here
+#+ATTR_LATEX: :placement [H] :width 0.4\textwidth
+[[file:1.3.1.svg]]
 *** Bode Plot
 For our given transfer function, we get:
 \begin{align*}
 |H(j\omega)| &= \frac{1}{\sqrt{\omega^2 + 0^2}} = \frac{1}{\omega} \\
 \angle H(j\omega) &= - \tan^{-1}\frac{\omega}{0} = \SI{-90}{\degree}
 \end{align*}
+#+ATTR_LATEX: :placement [H] :width 0.4\textwidth
+[[file:1.3.2.svg]]
 ** $H(s) = \dfrac{\omega_o}{s} + 1$ \hspace{0.7cm} $(\omega_o > 0)$
 *** Step Response
 \begin{align*}
@@ -149,7 +157,8 @@ y(t) &= \Lagri{Y(s)} = \Lagri{\frac{\omega_o}{s^2} + \frac{1}{s}} \\
 \end{align*}
 
 
-TODO: Add image here
+#+ATTR_LATEX: :placement [H] :width 0.4\textwidth
+[[file:1.4.1.svg]]
 *** Bode Plot
 \begin{align*}
 H(s) &= \dfrac{\omega_o}{s} + 1 \\
@@ -161,7 +170,8 @@ For our given transfer function, we get:
 \angle H(j\omega) &= \tan^{-1} \frac{\omega}{\omega_o} - \tan^{-1}\frac{\omega}{0} = \tan^{-1} \frac{\omega}{\omega_o} - \SI{90}{\degree}
 \end{align*}
 
-TODO: Add image here
+#+ATTR_LATEX: :placement [H] :width 0.4\textwidth
+[[file:1.4.2.svg]]
 
 ** $H(s) = \dfrac{\alpha \tau s + 1}{\tau s + 1}$ \hspace{0.7cm} $(\alpha = 100, \tau > 0)$
 *** Step Response
@@ -186,8 +196,9 @@ y(t) &= \Lagri{Y(s)} = \Lagri{\frac{1}{s} + \frac{\alpha - 1}{s + \frac{1}{\tau}
 &= 1 + (\alpha - 1)e^{-\frac{t}{\tau}}
 \end{align*}
 
+#+ATTR_LATEX: :placement [H] :width 0.7\textwidth
+[[file:1.5.1.svg]]
 
-TODO: Add image here
 *** Bode Plot
 \begin{align*}
 H(s) &= \frac{\alpha \tau s + 1}{\tau s + 1} \\
@@ -208,7 +219,8 @@ Note: $H(s)$ describes a lead compensator, where:
 \phi &= \sin^{-1}\frac{\alpha - 1}{\alpha + 1} &&:= \text{Max added phase at $\omega_m$} \\
 \end{align*}
 
-TODO: Add image here:
+#+ATTR_LATEX: :placement [H] :width 0.7\textwidth
+[[file:1.5.2.svg]]
 ** $H(s) = \dfrac{\tau s + 1}{\alpha\tau s + 1}$ \hspace{0.7cm} $(\alpha = 100, \tau > 0)$
 *** Step Response
 \begin{align*}
@@ -232,7 +244,8 @@ y(t) &= \Lagri{Y(s)} = \Lagri{\frac{1}{s} + \frac{\frac{1}{\alpha} - 1}{s + \fra
 \end{align*}
 
 
-TODO: Add image here
+#+ATTR_LATEX: :placement [H] :width 0.7\textwidth
+[[file:1.6.1.svg]]
 *** Bode Plot
 \begin{align*}
 H(s) &= \frac{\tau s + 1}{\alpha \tau s + 1} \\
@@ -253,8 +266,8 @@ Note: $H(s)$ describes a lag compensator, where:
 \phi &= \sin^{-1}\frac{\alpha - 1}{\alpha + 1} &&:= \text{Max subtracted phase at $\omega_m$} \\
 \end{align*}
 
-TODO: Add image here
-
+#+ATTR_LATEX: :placement [H] :width 0.7\textwidth
+[[file:1.6.2.svg]]
 * Problem 2
 For the following transfer function:
 \begin{equation*}
@@ -271,7 +284,8 @@ For our given transfer function, we get:
 \angle H(j\omega) &= - \tan^{-1}\frac{\omega}{100}
 \end{align*}
 
-TODO: Add image here
+#+ATTR_LATEX: :placement [H] :width 0.7\textwidth
+[[file:2.1.svg]]
 ** Find the response $y(t)$ to an input sinusoid $x(t) = \sin(10t + \pi/3)$
 <<sec:resp_deriv>>
 Input $x(t)$ is of the form $\sin(at + b)$, so the Laplace transform gives:
@@ -438,8 +452,8 @@ For our given transfer function, we get:
 |H(j\omega)| &= 10 \frac{1}{\sqrt{\omega^2 + 10^2}} \\
 \angle H(j\omega) &= - \tan^{-1}\frac{\omega}{10}
 \end{align*}
-
-TODO: Add image here
+#+ATTR_LATEX: :placement [H] :width 0.7\textwidth
+[[file:3.1.svg]]
 ** $H(s) = \dfrac{1}{s + 0.1}$
 For our given transfer function, we get:
 \begin{align*}
@@ -447,7 +461,8 @@ For our given transfer function, we get:
 \angle H(j\omega) &= - \tan^{-1}\frac{\omega}{0.1}
 \end{align*}
 
-TODO: Add image here
+#+ATTR_LATEX: :placement [H] :width 0.7\textwidth
+[[file:3.2.svg]]
 ** $H(s) = \dfrac{1 - 0.1s}{1 + 0.1s}$
 \begin{align*}
 H(s) &= \frac{1 - 0.1s}{1 + 0.1s} \\
@@ -468,7 +483,6 @@ The phase is then:
 H(s) &= \frac{1 - 0.1s}{1 + 0.1s} \\
 &= \frac{1 - s/10}{1 + s/10} \\
 \end{align*}
-For transfer functions with positive poles or zeros (here $H(s)$ has a positive zero at $s = +10$), the phase can be more easily seen by putting it in the form:
 For our given transfer function, we get:
 \begin{align*}
 |H(j\omega)| &= \frac{\sqrt{\omega^2 + 10^2}}{\sqrt{\omega^2 + 10^2}} = 1 \\
@@ -476,7 +490,8 @@ For our given transfer function, we get:
 &= 2\tan^{-1}\frac{\omega}{10}
 \end{align*}
 
-TODO: Add image here
+#+ATTR_LATEX: :placement [H] :width 0.7\textwidth
+[[file:3.3.svg]]
 ** $H(s) = \left(\dfrac{1}{s + 0.1}\right)\left(\dfrac{1 - 0.1s}{1 + 0.1s}\right)$
 \begin{align*}
 H(s) &= \left(\dfrac{1}{s + 0.1}\right)\left(\dfrac{1 - 0.1s}{1 + 0.1s}\right) \\
@@ -496,4 +511,5 @@ For our given transfer function, we get:
 \angle H(j\omega) &= \tan^{-1}\frac{\omega}{-10} - \tan^{-1}\frac{\omega}{0.1} - \tan^{-1}\frac{\omega}{10} \\
 &= - \tan^{-1}\frac{\omega}{0.1} - 2\tan^{-1}\frac{\omega}{10}
 \end{align*}
-TODO: Add image here
+#+ATTR_LATEX: :placement [H] :width 0.7\textwidth
+[[file:3.4.svg]]
