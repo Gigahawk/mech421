@@ -43,7 +43,7 @@ class OrgFormatter(IPython.core.formatters.BaseFormatter):
             return None
         try:
             return tabulate(obj, headers='keys',
-                            tablefmt='orgtbl', showindex='always')
+                            tablefmt='orgtbl', showindex=False)
         except:
             return None
 
@@ -172,6 +172,17 @@ For our given transfer function, we get:
 
 #+ATTR_LATEX: :placement [H] :width 0.4\textwidth
 [[file:1.4.2.svg]]
+
+Note: the gain is not exactly $\SI{40}{\decibel}$ at $\omega = \frac{\omega_o}{100}$, but it is basically close enough.
+More precisely:
+\begin{align*}
+|H(j\omega)|_{\omega = \frac{\omega_o}{a}} &=
+\frac{\sqrt{\frac{\omega_o^2}{a^2} + \omega_o^2}}{\frac{\omega_o}{a}} \\
+&= a \frac{\sqrt{\omega_o^2\left(\frac{1}{a^2} + 1\right)}}{\omega_o} \\
+&= a \sqrt{\frac{1}{a^2} + 1} \\
+&= \sqrt{a^2 + 1} \approx a & \text{(for large enough values of $a$)}
+\end{align*}
+
 
 ** $H(s) = \dfrac{\alpha \tau s + 1}{\tau s + 1}$ \hspace{0.7cm} $(\alpha = 100, \tau > 0)$
 *** Step Response
@@ -338,19 +349,19 @@ def calc_coeffs(a, b):
 a = 10
 b = np.pi/3
 A, B, C, D, E = calc_coeffs(a, b)
-A, B, C, D, E
+def disp_coeffs():
+    return pd.DataFrame(
+        ((A, B, C, D, E),),
+        columns=[f"${c}$" for c in ("A", "B" ,"C", "D", "E")])
+disp_coeffs()
 #+end_src
 
 #+RESULTS:
 :results:
-# Out[177]:
-#+BEGIN_EXAMPLE
-  (0.8660254037844386,
-  5.000000000000001,
-  -0.8079459443410284,
-  0.8079459443410284,
-  5.80794594434102)
-#+END_EXAMPLE
+# Out[407]:
+|      $A$ |   $B$ |       $C$ |      $D$ |     $E$ |
+|----------+-------+-----------+----------+---------|
+| 0.866025 |     5 | -0.807946 | 0.807946 | 5.80795 |
 :end:
 
 Plotting our results:
@@ -380,19 +391,15 @@ Using the results from Section [[sec:resp_deriv]]:
 a = 100
 b = 2*np.pi/3
 A, B, C, D, E = calc_coeffs(a, b)
-A, B, C, D, E
+disp_coeffs()
 #+end_src
 
 #+RESULTS:
 :results:
-# Out[155]:
-#+BEGIN_EXAMPLE
-  (0.8660254037844387,
-  -49.99999999999998,
-  -0.6830127018922192,
-  0.6830127018922192,
-  18.301270189221952)
-#+END_EXAMPLE
+# Out[397]:
+|        A |   B |         C |        D |       E |
+|----------+-----+-----------+----------+---------|
+| 0.866025 | -50 | -0.683013 | 0.683013 | 18.3013 |
 :end:
 
 Plotting our results:
@@ -412,19 +419,15 @@ Using the results from Section [[sec:resp_deriv]]:
 a = 1000
 b = np.pi
 A, B, C, D, E = calc_coeffs(a, b)
-A, B, C, D, E
+disp_coeffs()
 #+end_src
 
 #+RESULTS:
 :results:
-# Out[157]:
-#+BEGIN_EXAMPLE
-  (1.2246467991473532e-16,
-  -1000.0,
-  -0.09900990099009901,
-  0.09900990099009901,
-  -9.900990099009888)
-#+END_EXAMPLE
+# Out[398]:
+|           A |     B |          C |         D |        E |
+|-------------+-------+------------+-----------+----------|
+| 1.22465e-16 | -1000 | -0.0990099 | 0.0990099 | -9.90099 |
 :end:
 
 Plotting our results:
