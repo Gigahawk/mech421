@@ -1,0 +1,381 @@
+#+TITLE: MECH 421 Assignment 2
+#+AUTHOR: Jasper Chan - 37467164
+
+#+OPTIONS: toc:nil
+
+#+LATEX_HEADER: \definecolor{bg}{rgb}{0.95,0.95,0.95}
+#+LATEX_HEADER: \setminted{frame=single,bgcolor=bg,samepage=true}
+#+LATEX_HEADER: \setlength{\parindent}{0pt}
+#+LATEX_HEADER: \usepackage{float}
+#+LATEX_HEADER: \usepackage{svg}
+#+LATEX_HEADER: \usepackage{cancel}
+#+LATEX_HEADER: \usepackage{amssymb}
+#+LATEX_HEADER: \usepackage{mathtools, nccmath}
+#+LATEX_HEADER: \sisetup{per-mode=fraction}
+#+LATEX_HEADER: \newcommand{\Lwrap}[1]{\left\{#1\right\}}
+#+LATEX_HEADER: \newcommand{\Lagr}[1]{\mathcal{L}\Lwrap{#1}}
+#+LATEX_HEADER: \newcommand{\Lagri}[1]{\mathcal{L}^{-1}\Lwrap{#1}}
+#+LATEX_HEADER: \newcommand{\Ztrans}[1]{\mathcal{Z}\Lwrap{#1}}
+#+LATEX_HEADER: \newcommand{\Ztransi}[1]{\mathcal{Z}^{-1}\Lwrap{#1}}
+#+LATEX_HEADER: \newcommand{\ZOH}[1]{\text{ZOH}\left(#1\right)}
+#+LATEX_HEADER: \DeclarePairedDelimiter{\ceil}{\lceil}{\rceil}
+#+LATEX_HEADER: \makeatletter \AtBeginEnvironment{minted}{\dontdofcolorbox} \def\dontdofcolorbox{\renewcommand\fcolorbox[4][]{##4}} \makeatother
+
+#+LATEX_HEADER: \renewcommand\arraystretch{1.2}
+
+#+begin_src ipython :session :results none :exports none
+import numpy as np
+import pandas as pd
+from matplotlib import pyplot as plt
+from sympy import Symbol
+from IPython.display import set_matplotlib_formats
+%matplotlib inline
+set_matplotlib_formats('svg')
+#+end_src
+#+begin_src ipython :session :results none :exports none
+import IPython
+from tabulate import tabulate
+
+class OrgFormatter(IPython.core.formatters.BaseFormatter):
+    def __call__(self, obj):
+        if(isinstance(obj, str)):
+            return None
+        if(isinstance(obj, pd.core.indexes.base.Index)):
+            return None
+        try:
+            return tabulate(obj, headers='keys',
+                            tablefmt='orgtbl', showindex=False)
+        except:
+            return None
+
+ip = get_ipython()
+ip.display_formatter.formatters['text/org'] = OrgFormatter()
+#+end_src
+Let us consider a non-inverting amplifier shown in Fig. [[fig:fig1]].
+We assume that the op-amp input impedance $R_i$ is *infinite*, the output impedance $R_o$ is *non-zero*, and the open loop gain $A$ is a *finite constant*.
+There is a disturbance current $I_o$ injected into the amplifier output terminal.
+
+#+NAME: fig:fig1
+#+CAPTION: Schematic of a non-inverting amplifier.
+#+ATTR_LATEX: :width 0.7\textwidth
+[[file:fig1.svg]]
+
+#+NAME: fig:fig2
+#+CAPTION: Equivalent circuit model.
+#+ATTR_LATEX: :width 0.7\textwidth
+[[file:fig2.svg]]
+
+Fig. [[fig:fig2]] shows the equivalent circuit model.
+Here, the output stage of the op-amp is modeled as a dependent voltage source with series output impedance $R_o$.
+The output from the dependent voltage source is $V_a = AV_e$, where $V_e$ is the differential voltage applied to the op-amp input signal port.
+Note that the amplifier output voltage $V_o$ is not equal to $V_a$ because $R_o \ne 0$.
+* Problem 1
+** Find an expression for $V_o$ in terms of $V_a$ and $I_o$ as the input variables.
+Doing a current balance around node $V_o$:
+\begin{align*}
+\frac{V_o - 0}{\underbrace{R_2 + R_1}_{R}}
+&=
+\frac{V_a - V_o}{R_o} + I_o \\
+\frac{V_o}{R} + \frac{V_o}{R_o}
+&=
+\frac{V_a}{R_o} + I_o \\
+V_o\left(\frac{1}{R} + \frac{1}{R_o}\right)
+&=
+\frac{V_a}{R_o} + I_o \\
+V_o\frac{R_o + R}{R R_o}
+&=
+\frac{V_a}{R_o} + I_o \\
+V_o
+&=
+\frac{R(V_a + I_o R_o)}{R_o + R} \\
+&=
+\frac{R_1 + R_2}{R_o + R_1 + R_2}(V_a + I_o R_o)
+\end{align*}
+** Find an expression for $V_e$ in terms of $V_i$ and $V_o$ as the input variables.
+\begin{align*}
+V_e &= V_i - V_f \\
+&= V_i - V_o\frac{R_1}{R_1 + R_2}
+\end{align*}
+** Complete the block diagram in Fig. [[fig:fig3]]
+#+NAME: fig:fig3
+#+CAPTION: Block diagram.
+#+ATTR_LATEX: :width 0.8\textwidth :placement [H]
+[[file:fig3.svg]]
+* Problem 2
+For
+$R_o = \SI{50}{\ohm}$,
+$R_1 = \SI{1}{\kilo\ohm}$, and
+$R_2 = \SI{9}{\kilo\ohm}$,
+find the amplifier gain $V_o/V_i$ when:
+** $A = 10^5$
+\begin{align*}
+\frac{V_o}{V_i}
+&= 
+\frac{R}{R_o + R}\frac{V_a}{V_i} & \text{(ignore disturbance current for gain)} \\
+&= 
+A\frac{R}{R_o + R}\frac{V_e}{V_i} \\
+&=
+A\frac{R}{R_o + R}\frac{1}{V_i}
+\left(V_i - V_o\frac{R_1}{R}\right) \\
+&=
+A\frac{R}{R_o + R}
+\left(1 - \frac{V_o}{V_i}\frac{R_1}{R}\right) \\
+&=
+A\frac{R}{R_o + R} -
+A\frac{V_o}{V_i}\frac{R_1}{R_o + R} \\
+\frac{V_o}{V_i}
+\left(1 + A\frac{R_1}{R_o + R}\right)
+&= 
+A\frac{R}{R_o + R} \\
+\frac{V_o}{V_i}
+\frac{AR_1 + R_o + R}{R_o + R}
+&= 
+A\frac{R}{R_o + R} \\
+\frac{V_o}{V_i}
+AR_1 + R_o + R
+&= 
+AR \\
+\frac{V_o}{V_i}
+&= 
+\frac{AR}
+{AR_1 + R_o + R}
+\end{align*}
+
+Plugging in our values:
+#+begin_src ipython :session :results raw drawer :exports both
+R_o = 50  # ohm
+R_1 = 1000  # ohm
+R_2 = 9000  # ohm
+A = 10**5
+R = R_1 + R_2
+A*R/(A*R_1 + R_o + R)
+#+end_src
+
+#+RESULTS:
+:results:
+# Out[3]:
+: 9.99899510099235
+:end:
+
+** $A \to \infty$
+\begin{align*}
+\lim_{A \to \infty}
+\frac{V_o}{V_i}
+&= 
+\lim_{A \to \infty}
+\frac{AR}
+{AR_1 + R_o + R} \\
+&= 
+\frac{R}{R_1} \\
+\end{align*}
+Plugging in our values:
+#+begin_src ipython :session :results raw drawer :exports both
+R/R_1
+#+end_src
+
+#+RESULTS:
+:results:
+# Out[10]:
+: 10.0
+:end:
+* Problem 3
+For
+$R_o = \SI{50}{\ohm}$,
+$R_1 = \SI{1}{\kilo\ohm}$, and
+$R_2 = \SI{9}{\kilo\ohm}$,
+find the amplifier output impedance $V_o/I_o$ when:
+** $A = 10^5$
+\begin{align*}
+\frac{V_o}{I_o}
+&=
+\frac{R}{R_o + R}\frac{I_o R_o}{I_o} & \text{(ignore output voltage for impedance)} \\
+&=
+\frac{R}{R_o + R} R_o
+\end{align*}
+Plugging in our values:
+#+begin_src ipython :session :results raw drawer :exports both
+R*R_o/(R_o + R)  # ohm
+#+end_src
+
+#+RESULTS:
+:results:
+# Out[20]:
+: 49.75124378109453
+:end:
+
+** $A \to \infty$
+Since impedance is not affected by gain:
+#+begin_src ipython :session :results raw drawer :exports both
+R*R_o/(R_o + R)  # ohm
+#+end_src
+
+#+RESULTS:
+:results:
+# Out[21]:
+: 49.75124378109453
+:end:
+* Problem 4
+Let us consider an op-amp circuit shown in Figure [[fig:fig4]].
+We assume that the op-amp is *ideal*, i.e.
+the input impedance $R_i$ is infinite,
+the output impedance $R_o$ is zero,
+and the open loop gain $A$ is infinte.
+
+#+NAME: fig:fig4
+#+ATTR_LATEX: :width 0.5\textwidth
+#+CAPTION: Schematic of an inverting amplifier.
+[[file:fig4.svg]]
+** Derive the transfer function $V_o(s)/V_i(s)$
+Doing a current balance around $V_a$:
+\begin{align*}
+\frac{V_i - V_a}{R_1} + 
+\frac{V_o - V_a}{R_2} + 
+C \frac{d(V_o - V_a)}{dt}
+&= 0 \\
+\frac{V_i - V_a}{R_1} + 
+\frac{V_o - V_a}{R_2} + 
+C \frac{dV_o}{dt} - C\frac{dV_a}{dt}
+&= 0
+\end{align*}
+
+Since the op-amp is ideal, we can assume $V_a = 0$, hence:
+\begin{align*}
+\frac{V_i}{R_1} + 
+\frac{V_o}{R_2} + 
+C \dot{V}_o
+&=
+0 \\
+\frac{V_o}{R_2} + 
+C \dot{V}_o
+&=
+-\frac{V_i}{R_1} \\
+\Lagr{\frac{V_o}{R_2} + 
+C \dot{V}_o}
+&=
+\Lagr{-\frac{V_i}{R_1}} \\
+\frac{V_o(s)}{R_2} + 
+s C V_o(s)
+&=
+-\frac{V_i(s)}{R_1} \\
+V_o(s)
+\left(\frac{1}{R_2} + s C\right)
+&=
+-\frac{V_i(s)}{R_1} \\
+V_o(s)
+\frac{1 + s R_2 C}{R_2}
+&=
+-\frac{V_i(s)}{R_1} \\
+\frac{V_o(s)}{V_i(s)}
+&=
+-\frac{R_2}{R_1}\frac{1}{1 + s R_2 C} \\
+\end{align*}
+Plugging in our values:
+#+begin_src ipython :session :results raw drawer :exports both
+R_1 = 1000  # ohm
+R_2 = 10000  # ohm
+C = 0.01*10**-6  # F
+s = Symbol('s')
+-R_2/R_1/(1 + s*R_2*C)
+#+end_src
+
+#+RESULTS:
+:results:
+# Out[130]:
+: -10.0/(0.0001*s + 1)
+:end:
+
+** Plot the Bode plot and step response.
+For our given transfer function:
+\begin{align*}
+\frac{V_o(s)}{V_i(s)}
+&=
+-\frac{R_2}{R_1}\frac{1}{1 + s R_2 C} \\
+&=
+-\frac{1}{R_1 C}\frac{1}{\frac{1}{R_2 C} + s} \\
+\left|
+\frac{V_o(j\omega)}{V_i(j\omega)}
+\right|
+&=
+\frac{1}{R_1 C}\frac{1}{\sqrt{\omega^2 + \frac{1}{(R_2 C)^2}}} \\
+\angle
+\frac{V_o(j\omega)}{V_i(j\omega)}
+&=
+-\tan^{-1}\frac{\omega}{\frac{1}{R_2 C}} \\
+&=
+-\tan^{-1}(\omega R_2 C) \\
+\end{align*}
+
+We expect a DC gain of $\frac{R_2}{R_1}$,
+#+begin_src ipython :session :results raw drawer :exports both
+dc = 20*np.log10(R_2/R_1)
+dc  # dB
+#+end_src
+
+#+RESULTS:
+:results:
+# Out[217]:
+: 20.0
+:end:
+and the corner frequency at $\frac{1}{R_2 C}$,
+#+begin_src ipython :session :results raw drawer :exports both
+corner = 1/(R_2*C)
+corner  # rad/s
+#+end_src
+
+#+RESULTS:
+:results:
+# Out[218]:
+: 10000.0
+:end:
+following which the slope of the gain will drop off at \SI{20}{\decibel} per decade.
+We also expect the phase to be \SI{-45}{\degree} at the corner frequency.
+
+
+Let's plug in our values:
+#+begin_src ipython :session :results raw drawer :exports both
+def mag(o):
+    return 1/(R_1*C)/np.sqrt(o**2 + 1/(R_2*C)**2)
+def ang(o):
+    return -np.arctan(o*R_2*C)
+o = np.logspace(0, 8, 1000)
+m = 20*np.log10(mag(o))
+a = ang(o)/np.pi*180
+#+end_src
+
+#+RESULTS:
+:results:
+# Out[249]:
+:end:
+
+Now we can plot our results:
+#+begin_src ipython :session :results raw drawer :exports both
+fig, (ax1, ax2) = plt.subplots(2, sharex=True)
+fig.suptitle("Bode Plot")
+ax1.set_xscale("log")
+ax1.plot(o, m)
+ax1.vlines(corner, min(m), max(m), color='c', linestyles="dashed",
+           label="Corner freq")
+# DC Gain asymptote
+ax1.plot([min(o), corner], [dc, dc], color='r', linestyle="dashed",
+         label="Asymptotes")
+# 20dB/decade dropoff
+ax1.plot([corner, max(o)], [dc, dc - 20*np.log10(max(o)/corner)],
+         color='r', linestyle="dashed")
+ax1.legend()
+ax1.set_ylabel("Gain [dB]")
+ax2.plot(o, a)
+ax2.vlines(corner, min(a), max(a), color='c', linestyles="dashed",
+           label="Corner freq")
+ax2.plot([min(o), corner], [-45, -45], color='r', linestyle="dashed",
+         label="-45 deg")
+ax2.set_ylabel("Phase [deg]")
+ax2.set_xlabel("Frequency [rad/s]")
+_ = ax2.legend()
+#+end_src
+
+#+RESULTS:
+:results:
+# Out[250]:
+[[file:./obipy-resources/dly2EO.svg]]
+:end:
+
