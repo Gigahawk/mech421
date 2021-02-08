@@ -1,0 +1,423 @@
+#+TITLE: MECH 421 Prelab 1
+#+AUTHOR: Jasper Chan - 37467164
+
+#+OPTIONS: toc:nil
+
+#+LATEX_HEADER: \definecolor{bg}{rgb}{0.95,0.95,0.95}
+#+LATEX_HEADER: \setminted{frame=single,bgcolor=bg,samepage=true}
+#+LATEX_HEADER: \setlength{\parindent}{0pt}
+#+LATEX_HEADER: \usepackage{float}
+#+LATEX_HEADER: \usepackage{svg}
+#+LATEX_HEADER: \usepackage{cancel}
+#+LATEX_HEADER: \usepackage{amssymb}
+#+LATEX_HEADER: \usepackage{mathtools, nccmath}
+#+LATEX_HEADER: \sisetup{per-mode=fraction}
+#+LATEX_HEADER: \newcommand{\Lwrap}[1]{\left\{#1\right\}}
+#+LATEX_HEADER: \newcommand{\Lagr}[1]{\mathcal{L}\Lwrap{#1}}
+#+LATEX_HEADER: \newcommand{\Lagri}[1]{\mathcal{L}^{-1}\Lwrap{#1}}
+#+LATEX_HEADER: \newcommand{\Ztrans}[1]{\mathcal{Z}\Lwrap{#1}}
+#+LATEX_HEADER: \newcommand{\Ztransi}[1]{\mathcal{Z}^{-1}\Lwrap{#1}}
+#+LATEX_HEADER: \newcommand{\ZOH}[1]{\text{ZOH}\left(#1\right)}
+#+LATEX_HEADER: \DeclarePairedDelimiter{\ceil}{\lceil}{\rceil}
+#+LATEX_HEADER: \makeatletter \AtBeginEnvironment{minted}{\dontdofcolorbox} \def\dontdofcolorbox{\renewcommand\fcolorbox[4][]{##4}} \makeatother
+
+#+LATEX_HEADER: \renewcommand\arraystretch{1.2}
+
+#+begin_src ipython :session :results raw drawer :exports none
+import numpy as np
+import pandas as pd
+import os
+from matplotlib import pyplot as plt
+from sympy import Symbol
+from PySpice.Spice.Netlist import Circuit, SubCircuitFactory
+from PySpice.Spice.Library import SpiceLibrary
+from PySpice.Plot.BodeDiagram import bode_diagram
+from IPython.display import set_matplotlib_formats
+import shutil
+%matplotlib inline
+set_matplotlib_formats('svg')
+#+end_src
+
+#+RESULTS:
+:results:
+# Out[1]:
+:end:
+
+#+begin_src ipython :session :results raw drawer :exports none
+import IPython
+from tabulate import tabulate
+
+class OrgFormatter(IPython.core.formatters.BaseFormatter):
+    def __call__(self, obj):
+        if(isinstance(obj, list)):
+            return None
+        if(isinstance(obj, str)):
+            return None
+        if(isinstance(obj, pd.core.indexes.base.Index)):
+            return None
+        try:
+            return tabulate(obj, headers='keys',
+                            tablefmt='orgtbl', showindex=False)
+        except:
+            return None
+
+ip = get_ipython()
+ip.display_formatter.formatters['text/org'] = OrgFormatter()
+#+end_src
+
+#+RESULTS:
+:results:
+# Out[2]:
+:end:
+
+#+NAME: fig:lab_circuit
+#+ATTR_LATEX: :width 0.6\textwidth
+#+CAPTION: Circuit diagram of lab setup.
+[[file:lab_circuit.svg]]
+
+* Q1
+Select the values of $Z_1$ and $Z_2$ such that the DC gain of the voltage stage is 11.
+
+** Answer
+The datasheet for the PA13 does not list an output impedance, only an input impedance (which is negligible in our case), hence I will assume that it has a negligible output impedance $R_o = 0$.
+
+The typical open loop gain is given as $A = \SI{108}{\decibel}$
+
+From Homework 2, Problem 2:
+\begin{align*}
+\frac{V_o}{V_r}
+&= 
+\frac{\overbrace{Z_1 + Z_2}^{Z}}{\cancelto{0}{R_o} + Z_1 + Z_2}\frac{V_a}{V_i} \\
+&= 
+A\frac{V_e}{V_i} \\
+&=
+A\frac{1}{V_i}
+\left(V_i - V_o\frac{R_1}{R}\right) \\
+&=
+A
+\left(1 - \frac{V_o}{V_r}\frac{R_1}{R}\right) \\
+&=
+A -
+A\frac{V_o}{V_r}\frac{Z_1}{Z} \\
+\frac{V_o}{V_r}
+\left(1 + A\frac{Z_1}{Z}\right)
+&= 
+A \\
+\frac{V_o}{V_i}
+\frac{AZ_1 + Z}{Z}
+&= 
+A \\
+\frac{V_o}{V_r}
+AZ_1 + Z
+&= 
+AZ \\
+\frac{V_o}{V_r}
+&= 
+\frac{AZ}
+{AZ_1 + Z} \\
+\frac{V_o}{V_r}
+&=
+\frac{A(Z_1 + Z_2)}
+{AZ_1 + Z_1 + Z_2}
+\end{align*}
+
+Solving for $Z_1/Z_2$:
+\begin{align*}
+\frac{A(Z_1 + Z_2)}
+{AZ_1 + Z_1 + Z_2}
+&=
+11 \\
+AZ_1 + AZ_2
+&=
+Z_1(11(A + 1)) + 11Z_2 \\
+Z_1(A - 11(A + 1))
+&=
+Z_2(11 - A) \\
+-Z_1(10A + 11)
+&=
+Z_2(11 - A) \\
+\frac{Z_1}{Z_2}
+&=
+-\frac{11 - A}{10A + 11} \\
+\end{align*}
+
+Plugging our values in:
+#+begin_src ipython :session :results output code :exports both
+A_db = 108  # dB
+A = 10**(A_db/20)
+Z_12 = -(11 - A)/(10*A + 11)
+print(Z_12)
+#+end_src
+
+#+RESULTS:
+#+begin_src ipython
+0.09999518292433114
+#+end_src
+
+As expected for a non-inverting amplifier, $Z_2$ should be ten times greater than $Z_1$.
+Let's pick
+$Z_1 = \SI{10}{\kilo\ohm}$ and
+$Z_2 = \SI{100}{\kilo\ohm}$.
+
+We can also verify this with a SPICE simulation using PySpice.
+First, let's define our amplifier:
+#+begin_src ipython :session :results output code :exports both
+class PA13Amplifier(SubCircuitFactory):
+    __name__ = 'pa13_amplifier'
+    __nodes__ = ('in+', 'out')
+    def __init__(self, Z_1, Z_2, R_lim=0.2):
+        super().__init__()
+
+        # Supply rails
+        self.V('s+', 'vs+', self.gnd, 24)
+        self.V('s-', self.gnd, 'vs-', 24)
+
+        # PA13
+        self.X('1', 'PA13',
+                'in+', 'in-', 'out',  # Inputs/outputs
+                'vs+', 'vs-',  # Supply rails
+                'cl+', 'cl-',  #  Current limit
+                self.gnd)  # foldover
+
+        # Current limiting resistors
+        self.R('lim+', 'cl+', 'out', R_lim)
+        self.R('lim-', 'cl-', 'out', R_lim)
+
+        # Gain setting resistors
+        self.R('z1', self.gnd, 'in-', Z_1)
+        self.R('z2', 'in-', 'out', Z_2)
+
+class PA13AmplifierOpen(SubCircuitFactory):
+    __name__ = 'pa13_amplifier'
+    __nodes__ = ('in+', 'out')
+    def __init__(self, R_lim=0.002):
+        super().__init__()
+
+        # Supply rails
+        self.V('s+', 'vs+', self.gnd, 1000000000000000000000)
+        self.V('s-', self.gnd, 'vs-', 1000000000000000000000)
+
+        # PA13
+        self.X('1', 'PA13',
+                'in+', self.gnd, 'out',  # Inputs/outputs
+                'vs+', 'vs-',  # Supply rails
+                'cl+', 'cl-',  #  Current limit
+                self.gnd)  # foldover
+
+        # Current limiting resistors
+        self.R('lim+', 'cl+', 'out', R_lim)
+        self.R('lim-', 'cl-', 'out', R_lim)
+#+end_src
+
+#+RESULTS:
+#+begin_src ipython
+#+end_src
+
+Now we can run our simulation with a DC input:
+#+begin_src ipython :session :results output code :exports both
+V_in = 0.1  # V
+Z_1 = 10*10**3  # ohm
+Z_2 = 100*10**3  # ohm
+shutil.copyfile('PA13.LIB', '/tmp/PA13.LIB')  # Hack to avoid spaces in filepath
+
+circuit = Circuit('PA13 Amplifier')
+circuit.include('/tmp/PA13.LIB')
+
+#circuit.subcircuit(PA13Amplifier(Z_1, Z_2))
+circuit.subcircuit(PA13AmplifierOpen())
+circuit.X('1', 'pa13_amplifier', 'vr', 'vo')
+
+# Input
+circuit.V('input', 'vr', circuit.gnd, V_in)
+
+simulator = circuit.simulator()
+analysis = simulator.operating_point()
+print(f"V_r: {float(analysis.nodes['vr'])} V")
+print(f"V_o: {float(analysis.nodes['vo'])} V")
+#+end_src
+
+#+RESULTS:
+#+begin_src ipython
+V_r: 0.1 V
+V_o: 11408.24527873428 V
+#+end_src
+
+
+* Q2
+Based on the PA13 open-loop frequency response shown in Figure [[fig:freq_resp]], calculate the closed-loop bandwidth of the designed voltage stage.
+Also, draw the Bode plot and expected step response of the closed-loop transfer function $V_o(s)/V_r(s)$.
+
+#+ATTR_LATEX: :placement [H]
+#+NAME: fig:freq_resp
+#+CAPTION: Open-loop frequency response of PA13.
+[[file:freq_resp.svg]]
+
+** Answer
+#+begin_src ipython :session :results raw drawer :exports both
+circuit = Circuit('PA13 Amplifier Bode')
+circuit.include('/tmp/PA13.LIB')
+circuit.subcircuit(PA13Amplifier(Z_1, Z_2))
+circuit.X('1', 'pa13_amplifier', 'in+', 'vo')
+
+# Input
+circuit.SinusoidalVoltageSource(
+    'input', 'in+', circuit.gnd, amplitude=0.1)
+
+simulator = circuit.simulator()
+analysis = simulator.ac(
+    start_frequency=10**2,
+    stop_frequency=10**8,
+    number_of_points=50,
+    variation='dec')
+freq = analysis.frequency
+gain = 20*np.log10(np.absolute(analysis.vo))
+phase = np.angle(analysis.vo, deg=False)
+
+idx = (np.abs(gain - (gain[0] - 3))).argmin()
+brk_freq = freq[idx]
+#+end_src
+
+#+RESULTS:
+:results:
+# Out[282]:
+: 17.827369689941406
+:end:
+
+#+begin_src ipython :session :results raw drawer :exports both
+#_mag = np.absolute(analysis.vo)
+#mag = np.array(_mag).astype(float)
+#idx1 = (np.abs(mag - 0.01)).argmin()
+#idx2 = (np.abs(mag - 1)).argmin()
+#f1 = float(analysis.frequency[idx1])
+#f2 = float(analysis.frequency[idx2])
+#f1, f2, f1/f2
+
+figure, axes = plt.subplots(2, figsize=(5, 8))
+bode_diagram(axes=axes, frequency=freq, gain=gain, phase=phase)
+#+end_src
+
+#+RESULTS:
+:results:
+# Out[238]:
+: UnitValue(10.99938678741455 V)
+:end:
+
+
+* Q3
+Assuming
+the motor winding resistance $R_m = \SI{3}{\ohm}$ and
+the motor inductance is $L_m = \SI{1}{\milli\henry}$,
+calculate the transfer function from the output voltage $V_o$ to the output current $I_o$ and the time constant.
+Also, draw the Bode plot $I_o(s)/V_o(s)$
+** Answer
+asdf
+* Q4
+Draw the Bode plot $V_{Io}(s)/V_r(s)$ and its step response
+** Answer
+
+\appendix
+* Extracting the Gain Curve of the PA13
+In order to extract precise data points from the datasheet, we first isolate the vector image of the curve from the datasheet PDF, making sure the image borders match the border of the graph.
+
+#+ATTR_LATEX: :placement [H] :width 0.5\textwidth
+#+CAPTION: Gain curve of the PA13 extracted from the datasheet.
+[[file:gain_curve_datasheet.svg]]
+
+Next, we convert the vector image to a bitmap for easier processing:
+#+begin_src sh :exports both :eval never-export
+inkscape --export-type="png" --export-dpi=600 gain_curve_datasheet.svg
+#+end_src
+
+#+RESULTS:
+
+Now we can open the bitmap using Pillow to extract positional discrete values at each pixel location.
+#+begin_src ipython :session :eval never-export :results raw drawer :exports both
+from PIL import Image
+img = Image.open('gain_curve_datasheet.png')
+raw_w, raw_h = img.size
+
+# All pixels are "black", we're only interested in the alpha value
+pixels = np.array(img.getdata(band=3))
+pixels = pixels.reshape(raw_h, raw_w)
+
+raw_y = []
+for col in pixels.T:
+    # Value at each point in column is weight, and index is position
+    weighted = np.multiply(col, np.arange(len(col)))
+    centroid = raw_h - np.sum(weighted)/np.sum(col)
+    raw_y.append(centroid)
+raw_y = np.array(raw_y)
+raw_x = np.arange(raw_w)
+#+end_src
+
+#+RESULTS:
+:results:
+# Out[91]:
+:end:
+
+Now that we have our raw values, we can scale them back to match the values in the graph
+#+begin_src ipython :session :eval never-export :results raw drawer :exports both
+gain_min, gain_max = -20, 120  # dB
+gain_range = gain_max - gain_min
+f_min, f_max = 0, 7  # 10^n Hz
+gain_db = raw_y/raw_h*gain_range + gain_min
+f_hz = np.logspace(f_min, f_max, num=raw_w, base=10)
+#+end_src
+
+#+RESULTS:
+:results:
+# Out[121]:
+: 1.0058785107772699
+:end:
+
+We can plot the values to ensure that we've preserved the shape:
+#+begin_src ipython :session :eval never-export :results raw drawer :ipyfile gain_pyplot.svg :exports both
+plt.plot(f_hz, gain_db)
+plt.xscale('log')
+plt.xlim(10**f_min, 10**f_max)
+plt.ylim(gain_min, gain_max)
+plt.grid()
+plt.xlabel("Frequency, F (Hz)")
+plt.ylabel("Open Loop Gain, A (dB)")
+plt.title("Small Signal Response")
+
+# Hack to get plot aspect ratio to be square
+ax = plt.gca()
+fig  = plt.gcf()
+fwidth = fig.get_figwidth()
+fheight = fig.get_figheight()
+bb = ax.get_position()
+axwidth = fwidth * (bb.x1 - bb.x0)
+axheight = fheight * (bb.y1 - bb.y0)
+if axwidth > axheight:
+    narrow_by = (axwidth - axheight) / fwidth
+    bb.x0 += narrow_by / 2
+    bb.x1 -= narrow_by / 2
+elif axheight > axwidth:
+    shrink_by = (axheight - axwidth) / fheight
+    bb.y0 += shrink_by / 2
+    bb.y1 -= shrink_by / 2
+
+# Scale width to match datasheet
+ratio = raw_w/raw_h
+bbwidth = bb.x1 - bb.x0
+largen_by = (ratio - 1)*bbwidth
+bb.x0 -= largen_by / 2
+bb.x1 += largen_by / 2
+
+ax.set_position(bb)
+_ = plt.xticks(np.logspace(f_min, f_max, num=f_max - f_min + 1, base=10))
+#+end_src
+
+#+RESULTS:
+:results:
+# Out[126]:
+[[file:gain_pyplot.svg]]
+:end:
+
+Overlaying the original plot from the datasheet by hand, we see that the plots line up almost perfectly:
+#+ATTR_LATEX: :placement [H]
+#+CAPTION: Overlay of generated and datasheet PA13 gain curves
+[[file:gain_pyplot_overlay.svg]]
+
+
