@@ -23,6 +23,13 @@
 
 #+LATEX_HEADER: \renewcommand\arraystretch{1.2}
 
+#+begin_src elisp :session :exports none
+(org-babel-tangle)
+#+end_src
+
+#+RESULTS:
+| frac_fit.m |
+
 #+begin_src ipython :session :results raw drawer :exports none
 import numpy as np
 import pandas as pd
@@ -40,7 +47,7 @@ set_matplotlib_formats('svg')
 
 #+RESULTS:
 :results:
-# Out[1]:
+# Out[3]:
 :end:
 
 #+begin_src ipython :session :results raw drawer :exports none
@@ -67,7 +74,7 @@ ip.display_formatter.formatters['text/org'] = OrgFormatter()
 
 #+RESULTS:
 :results:
-# Out[2]:
+# Out[4]:
 :end:
 
 #+NAME: fig:lab_circuit
@@ -186,27 +193,6 @@ class PA13Amplifier(SubCircuitFactory):
         # Gain setting resistors
         self.R('z1', self.gnd, 'in-', Z_1)
         self.R('z2', 'in-', 'out', Z_2)
-
-class PA13AmplifierOpen(SubCircuitFactory):
-    __name__ = 'pa13_amplifier'
-    __nodes__ = ('in+', 'out')
-    def __init__(self, R_lim=0.002):
-        super().__init__()
-
-        # Supply rails
-        self.V('s+', 'vs+', self.gnd, 1000000000000000000000)
-        self.V('s-', self.gnd, 'vs-', 1000000000000000000000)
-
-        # PA13
-        self.X('1', 'PA13',
-                'in+', self.gnd, 'out',  # Inputs/outputs
-                'vs+', 'vs-',  # Supply rails
-                'cl+', 'cl-',  #  Current limit
-                self.gnd)  # foldover
-
-        # Current limiting resistors
-        self.R('lim+', 'cl+', 'out', R_lim)
-        self.R('lim-', 'cl-', 'out', R_lim)
 #+end_src
 
 #+RESULTS:
@@ -215,7 +201,7 @@ class PA13AmplifierOpen(SubCircuitFactory):
 
 Now we can run our simulation with a DC input:
 #+begin_src ipython :session :results output code :exports both
-V_in = 0.1  # V
+V_in = 1  # V
 Z_1 = 10*10**3  # ohm
 Z_2 = 100*10**3  # ohm
 shutil.copyfile('PA13.LIB', '/tmp/PA13.LIB')  # Hack to avoid spaces in filepath
@@ -223,8 +209,7 @@ shutil.copyfile('PA13.LIB', '/tmp/PA13.LIB')  # Hack to avoid spaces in filepath
 circuit = Circuit('PA13 Amplifier')
 circuit.include('/tmp/PA13.LIB')
 
-#circuit.subcircuit(PA13Amplifier(Z_1, Z_2))
-circuit.subcircuit(PA13AmplifierOpen())
+circuit.subcircuit(PA13Amplifier(Z_1, Z_2))
 circuit.X('1', 'pa13_amplifier', 'vr', 'vo')
 
 # Input
@@ -238,8 +223,8 @@ print(f"V_o: {float(analysis.nodes['vo'])} V")
 
 #+RESULTS:
 #+begin_src ipython
-V_r: 0.1 V
-V_o: 11408.24527873428 V
+V_r: 1.0 V
+V_o: 10.979827608229467 V
 #+end_src
 
 
@@ -253,6 +238,189 @@ Also, draw the Bode plot and expected step response of the closed-loop transfer 
 [[file:freq_resp.svg]]
 
 ** Answer
+The phase plot shown in Figure [[fig:freq_resp]] looks like a system with multiple poles, whereas the gain plot looks like a single fractional integrator pole at about $\SI{100}{\hertz}$.
+This suggests that the underlying transfer function is probably rather complicated and nonlinear.
+However, if the phase plot does not significantly change due to the outside environment (i.e. resistor values, current draw, etc.), we can use a fractional integrator model shown below to find the bandwidth.
+\begin{align}
+A_\text{gain}(s) &= \frac{K}{s^{a} + b} & K, a, b \in \mathbb{R}
+\end{align}
+
+First, we must actually find the parameters $K$, $a$, and $b$ using the plot values extracted in Appendix [[apx:extract]].
+
+Let's start by loading our data into MATLAB:
+#+begin_src matlab :session :results output code :exports code
+dat = readmatrix('gain_data.csv', 'NumHeaderLines', 1);
+freq_hz = dat(:, 1);
+gain_db = dat(:, 2);
+freq_rad = 2*pi*freq_hz;
+gain_abs = 10.^(gain_db./20);
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+#+end_src
+
+Using the FOMCON library to define our fitting function:
+#+begin_src matlab :exports code :tangle frac_fit.m
+function vals = frac_fit(x, omega)
+    s = fotf('s');
+    K = x(1);
+    a = x(2);
+    b = x(3);
+    A = K/(s^a + b);
+    [vals, ~] = bode(A, omega);
+    % data is returned as 1x1xn matrix for some reason
+    vals = reshape(vals, [numel(vals) 1]);
+end
+#+end_src
+
+Now let's set an initial guess and fit our data:
+#+begin_src matlab :session :results output code :exports code
+b_0 = 2*pi*100;
+K_0 = max(gain_abs)*b_0;
+a_0 = 1.3;
+x_0 = [K_0 a_0 b_0];
+K_l = 4e8;
+a_l = 1.2;
+b_l = 2*pi*10;
+x_l = [K_l a_l b_l];
+K_h = 6e8;
+a_h = 1.3;
+b_h = 2*pi*1000;
+x_h = [K_h a_h b_h];
+% Weight by frequency to get more accurate exponent
+cost = @(x)freq_rad.*(frac_fit(x, freq_rad) - gain_abs);
+
+options = optimoptions('lsqnonlin');
+options.MaxFunctionEvaluations = 1e3;
+x = lsqnonlin(cost, x_0, x_l, x_h, options);
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+Local minimum possible.
+lsqnonlin stopped because the final change in the sum of squares relative to 
+its initial value is less than the value of the function tolerance.
+#+end_src
+
+Creating our transfer function:
+#+begin_src matlab :session :results output code :exports both
+K = x(1);
+a = x(2);
+b = x(3);
+s = fotf('s');
+A_gain = K/(s^a + b)
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+Fractional-order transfer function:
+   5.5245e+08
+-----------------
+s^{1.2301}+2531.8
+#+end_src
+
+Plotting our function against our data to verify:
+#+begin_src matlab :session :results file :exports both
+f_name = 'fit_gain_plot.svg'
+fig = figure('visible', 'off',...
+            'Position', [0 0 600 300]);
+[mag, ~] = bode(A_gain, freq_rad);
+mag = reshape(mag, [numel(mag) 1]);
+mag = 20*log10(mag);
+semilogx(freq_hz, mag);
+hold on;
+semilogx(freq_hz, gain_db, '--');
+hold off;
+xlim([min(freq_hz), max(freq_hz)]);
+ylim([-20, 120]);
+fig.Renderer = 'painters';
+l = legend('Fit', 'Raw Data');
+set(l, 'color', 'none', 'edgecolor', 'none');
+xlabel('Frequency [Hz]');
+ylabel('Gain [dB]');
+title('PA13 Open Loop Gain Response');
+saveas(fig, f_name);
+ans = f_name
+#+end_src
+
+#+RESULTS:
+[[file:fit_gain_plot.svg]]
+
+Now that we know our fit is representative of the data, we can find the closed loop bandwidth:
+#+begin_src matlab :session :results output code :exports both
+f = 1/11;
+G_cl = A_gain/(1 + A_gain*f)
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+Fractional-order transfer function:
+     5.5245e+08s^{1.2301}+1.3987e+12
+------------------------------------------
+s^{2.4602}+5.0228e+07s^{1.2301}+1.2716e+11
+#+end_src
+
+Computing the frequency response and finding our \SI{-3}{\decibel} bandwidth:
+#+begin_src matlab :session :results output code :exports both
+fr = 2*pi*logspace(0, 7, 100000);
+[mag, ~] = bode(G_cl, fr);
+mag = reshape(mag, [numel(mag) 1]);
+mag = 20*log10(mag);  % dB
+dc_gain = mag(1)
+bw_lim = dc_gain - 3;
+[~, bw_idx] = min(abs(mag-bw_lim));
+bw = fr(bw_idx)/(2*pi)  % Hz
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+dc_gain =
+   20.8274
+bw =
+   3.8385e+05
+#+end_src
+
+Plotting our results:
+#+begin_src matlab :session :results file :exports both
+f_name = 'cl_gain_plot.svg'
+fig = figure('visible', 'off',...
+            'Position', [0 0 600 300]);
+[mag, ~] = bode(G_cl, freq_rad);
+mag = reshape(mag, [numel(mag) 1]);
+mag = 20*log10(mag);
+semilogx(freq_hz, mag);
+xline(bw);
+xlim([min(freq_hz), max(freq_hz)]);
+fig.Renderer = 'painters';
+xlabel('Frequency [Hz]');
+ylabel('Gain [dB]');
+title('PA13 Closed Loop Gain Response');
+saveas(fig, f_name);
+ans = f_name
+#+end_src
+
+#+RESULTS:
+[[file:cl_gain_plot.svg]]
+
+Computing and plotting the step response:
+#+begin_src matlab :session :results file :exports both
+f_name = 'cl_step_plot.svg'
+fig = figure('visible', 'off',...
+            'Position', [0 0 600 300]);
+step(G_cl);
+xlim(1e-3*[-0.1 1])
+ylim([0 13])
+fig.Renderer = 'painters';
+title('PA13 Closed Loop Step Response');
+saveas(fig, f_name);
+ans = f_name
+#+end_src
+
+#+RESULTS:
+[[file:cl_step_plot.svg]]
+
+Note that these results seem to somewhat correlate to simulation results from PySpice
 #+begin_src ipython :session :results raw drawer :exports both
 circuit = Circuit('PA13 Amplifier Bode')
 circuit.include('/tmp/PA13.LIB')
@@ -265,43 +433,35 @@ circuit.SinusoidalVoltageSource(
 
 simulator = circuit.simulator()
 analysis = simulator.ac(
-    start_frequency=10**2,
-    stop_frequency=10**8,
-    number_of_points=50,
+    start_frequency=10**0,
+    stop_frequency=10**7,
+    number_of_points=100,
     variation='dec')
 freq = analysis.frequency
 gain = 20*np.log10(np.absolute(analysis.vo))
 phase = np.angle(analysis.vo, deg=False)
 
 idx = (np.abs(gain - (gain[0] - 3))).argmin()
-brk_freq = freq[idx]
+bw = np.absolute(freq[idx])
+figure, (ax1, ax2) = plt.subplots(2, figsize=(5, 5), sharex=True)
+bode_diagram(axes=(ax1, ax2), frequency=freq, gain=gain, phase=phase)
+ax1.vlines(bw.value, min(gain), max(gain), color='r')
+ax2.vlines(bw.value, min(phase), max(phase), color='r')
+bw
 #+end_src
 
 #+RESULTS:
 :results:
-# Out[282]:
-: 17.827369689941406
+# Out[64]:
+: FrequencyValue(478630.09375 Hz)
+[[file:./obipy-resources/B8iQRX.svg]]
 :end:
+As shown in the figure, the phase plot seems to be significantly different from what the datasheet shows.
+The gain plot also shows some odd differences.
+The open loop portion of the plot does not appear to match the datasheet, and the bandwidth is slightly different.
 
-#+begin_src ipython :session :results raw drawer :exports both
-#_mag = np.absolute(analysis.vo)
-#mag = np.array(_mag).astype(float)
-#idx1 = (np.abs(mag - 0.01)).argmin()
-#idx2 = (np.abs(mag - 1)).argmin()
-#f1 = float(analysis.frequency[idx1])
-#f2 = float(analysis.frequency[idx2])
-#f1, f2, f1/f2
-
-figure, axes = plt.subplots(2, figsize=(5, 8))
-bode_diagram(axes=axes, frequency=freq, gain=gain, phase=phase)
-#+end_src
-
-#+RESULTS:
-:results:
-# Out[238]:
-: UnitValue(10.99938678741455 V)
-:end:
-
+However, it should be noted that the simulation and fitted curves seem to have the same general shape.
+This suggests that the simulation model provided by Apex Analaog is using a similar fractional order integrator, just with parameters that are different from what the datasheet suggests.
 
 * Q3
 Assuming
@@ -310,13 +470,99 @@ the motor inductance is $L_m = \SI{1}{\milli\henry}$,
 calculate the transfer function from the output voltage $V_o$ to the output current $I_o$ and the time constant.
 Also, draw the Bode plot $I_o(s)/V_o(s)$
 ** Answer
-asdf
+The impedance of an inductor is:
+\begin{equation*}
+Z_L = Ls
+\end{equation*}
+
+For our circuit, the current through the motor is given by:
+\begin{equation*}
+I_o(s) &= \frac{V_o(s)}{R_s + R_m + Z_{L_m}}
+\end{equation*}
+The transfer function is then:
+\begin{equation*}
+\frac{I_o(s)}{V_o(s)} &= \frac{1}{R_s + R_m + L_m s}
+\end{equation*}
+
+Plugging in our values:
+#+begin_src matlab :session :results output code :exports both
+R_m = 3;  % ohm
+L_m = 1e-3;  % H
+R_s = 0.2; % ohm
+
+I_V = 1/(R_s + R_m + L_m*s)
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+Fractional-order transfer function:
+    1
+----------
+0.001s+3.2
+#+end_src
+
+Plotting the Bode plot: 
+#+begin_src matlab :session :results file :exports both
+f_name = 'curr_bode_plot.svg'
+fig = figure('visible', 'off',...
+            'Position', [0 0 600 600]);
+bode(I_V);
+fig.Renderer = 'painters';
+saveas(fig, f_name);
+ans = f_name
+#+end_src
+
+#+RESULTS:
+[[file:curr_bode_plot.svg]]
+
 * Q4
 Draw the Bode plot $V_{Io}(s)/V_r(s)$ and its step response
 ** Answer
+From Ohm's Law:
+\begin{align*}
+V_{Io}(s) &= I_o(s)R_s \\
+\frac{V_{Io}(s)}{V_r(s)} &= \frac{I_o(s)}{V_r(s)}R_s \\
+\frac{V_{Io}(s)}{V_r(s)} &= \frac{I_o(s)}{V_o(s)}\frac{V_o(s)}{V_r(s)}R_s
+\end{align*}
+
+
+Plotting the Bode plot[fn:approx_phase]:
+#+begin_src matlab :session :results file :exports both
+f_name = 'mot_bode_plot.svg'
+fig = figure('visible', 'off',...
+            'Position', [0 0 600 600]);
+V_io_r = I_V*G_cl*R_s;
+bode(V_io_r, freq_rad);
+saveas(fig, f_name);
+ans = f_name
+#+end_src
+
+#+RESULTS:
+[[file:mot_bode_plot.svg]]
+
+Plotting the step response:
+#+begin_src matlab :session :results file :exports both
+f_name = 'mot_step_plot.svg'
+fig = figure('visible', 'off',...
+            'Position', [0 0 600 300]);
+step(V_io_r, linspace(0, 5e-3));
+saveas(fig, f_name);
+ans = f_name
+#+end_src
+
+#+RESULTS:
+[[file:mot_step_plot.svg]]
+
+[fn:approx_phase] This plot will assume that the true transfer function of the PA13 is the fractional order integrator, therefore the phase will not match the datasheet.
+If the phase plot based on the datasheet is desired, it's a simple matter of adding the phase plot from the datasheet with the phase plot of the motor windings.
+
+
+
+
 
 \appendix
 * Extracting the Gain Curve of the PA13
+<<apx:extract>>
 In order to extract precise data points from the datasheet, we first isolate the vector image of the curve from the datasheet PDF, making sure the image borders match the border of the graph.
 
 #+ATTR_LATEX: :placement [H] :width 0.5\textwidth
@@ -330,13 +576,13 @@ inkscape --export-type="png" --export-dpi=600 gain_curve_datasheet.svg
 
 #+RESULTS:
 
-Now we can open the bitmap using Pillow to extract positional discrete values at each pixel location.
+Now we can open the bitmap using Pillow to extract positional values at each pixel location.
 #+begin_src ipython :session :eval never-export :results raw drawer :exports both
 from PIL import Image
 img = Image.open('gain_curve_datasheet.png')
 raw_w, raw_h = img.size
 
-# All pixels are "black", we're only interested in the alpha value
+# All pixels are black, so we're only interested in the alpha value
 pixels = np.array(img.getdata(band=3))
 pixels = pixels.reshape(raw_h, raw_w)
 
@@ -366,8 +612,7 @@ f_hz = np.logspace(f_min, f_max, num=raw_w, base=10)
 
 #+RESULTS:
 :results:
-# Out[121]:
-: 1.0058785107772699
+# Out[134]:
 :end:
 
 We can plot the values to ensure that we've preserved the shape:
@@ -411,7 +656,7 @@ _ = plt.xticks(np.logspace(f_min, f_max, num=f_max - f_min + 1, base=10))
 
 #+RESULTS:
 :results:
-# Out[126]:
+# Out[139]:
 [[file:gain_pyplot.svg]]
 :end:
 
@@ -420,4 +665,17 @@ Overlaying the original plot from the datasheet by hand, we see that the plots l
 #+CAPTION: Overlay of generated and datasheet PA13 gain curves
 [[file:gain_pyplot_overlay.svg]]
 
+With this, we can be reasonably sure that the extracted data faithfully reproduces the original curve, and we can save the data for processing:
+#+begin_src ipython :session :eval never-export :results raw drawer :exports both
+df = pd.DataFrame(
+    data={
+        'Freq (Hz)': f_hz,
+        'Gain (dB)': gain_db})
+df.to_csv('gain_data.csv', index=False)
+#+end_src
+
+#+RESULTS:
+:results:
+# Out[140]:
+:end:
 
