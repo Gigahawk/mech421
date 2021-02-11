@@ -1,0 +1,374 @@
+#+TITLE: MECH 421 Assignment 3
+#+AUTHOR: Jasper Chan - 37467164
+
+#+OPTIONS: toc:nil
+
+#+LATEX_HEADER: \definecolor{bg}{rgb}{0.95,0.95,0.95}
+#+LATEX_HEADER: \setminted{frame=single,bgcolor=bg,samepage=true}
+#+LATEX_HEADER: \setlength{\parindent}{0pt}
+#+LATEX_HEADER: \usepackage{float}
+#+LATEX_HEADER: \usepackage{svg}
+#+LATEX_HEADER: \usepackage{cancel}
+#+LATEX_HEADER: \usepackage{amssymb}
+#+LATEX_HEADER: \usepackage{mathtools, nccmath}
+#+LATEX_HEADER: \sisetup{per-mode=fraction}
+#+LATEX_HEADER: \newcommand{\Lwrap}[1]{\left\{#1\right\}}
+#+LATEX_HEADER: \newcommand{\Lagr}[1]{\mathcal{L}\Lwrap{#1}}
+#+LATEX_HEADER: \newcommand{\Lagri}[1]{\mathcal{L}^{-1}\Lwrap{#1}}
+#+LATEX_HEADER: \newcommand{\Ztrans}[1]{\mathcal{Z}\Lwrap{#1}}
+#+LATEX_HEADER: \newcommand{\Ztransi}[1]{\mathcal{Z}^{-1}\Lwrap{#1}}
+#+LATEX_HEADER: \newcommand{\ZOH}[1]{\text{ZOH}\left(#1\right)}
+#+LATEX_HEADER: \DeclarePairedDelimiter{\ceil}{\lceil}{\rceil}
+#+LATEX_HEADER: \makeatletter \AtBeginEnvironment{minted}{\dontdofcolorbox} \def\dontdofcolorbox{\renewcommand\fcolorbox[4][]{##4}} \makeatother
+
+#+LATEX_HEADER: \renewcommand\arraystretch{1.2}
+
+#+begin_src ipython :session :results none :exports none
+import numpy as np
+import pandas as pd
+from matplotlib import pyplot as plt
+from sympy import Symbol
+from IPython.display import set_matplotlib_formats
+%matplotlib inline
+set_matplotlib_formats('svg')
+#+end_src
+#+begin_src ipython :session :results none :exports none
+import IPython
+from tabulate import tabulate
+
+class OrgFormatter(IPython.core.formatters.BaseFormatter):
+    def __call__(self, obj):
+        if(isinstance(obj, str)):
+            return None
+        if(isinstance(obj, pd.core.indexes.base.Index)):
+            return None
+        try:
+            return tabulate(obj, headers='keys',
+                            tablefmt='orgtbl', showindex=False)
+        except:
+            return None
+
+ip = get_ipython()
+ip.display_formatter.formatters['text/org'] = OrgFormatter()
+#+end_src
+* Problem 1
+Let us consider an op-amp circuit in Figure [[fig:fig1]].
+We assume that the op-amp input impedance is infinite, the output impedance is $R_o$, and the open-loop gain is $A(s)$.
+Note that the output impedance $R_o$ is pulled out of the op-amp
+
+#+NAME: fig:fig1
+#+CAPTION: Schematic of a non-inverting amplifier.
+#+ATTR_LATEX: :width 0.7\textwidth
+[[file:fig1.svg]]
+** Q1
+Draw a block diagram that shows the relation between the input voltage $V_i$, disturbance current $I_o$, and the output voltage $V_o$.
+The block diagram should show a feedback loop around $A(s)$.
+*** Answer
+The circuit diagram shown in Figure [[fig:fig1]] is identical to Problem 1 from Homework 2, hence the block diagram will be the same.
+#+NAME: fig:fig3
+#+CAPTION: Block diagram.
+#+ATTR_LATEX: :width 0.8\textwidth :placement [H]
+[[file:q1ans.svg]]
+** Q2
+Find the expression for the loop transfer function $L(s)$.
+Also, find the expression for the output impedance $Z_o(s) = V_o/I_o$ in terms of $L(s)$, $R_o$, $R_1$, and $R_2$.
+*** Answer
+The loop transfer function $L(s)$ is the negative of the product of all of the gains within the loop:
+\begin{align*}
+-L(s) &= -A \frac{R_1 + R_2}{R_o + R_1 + R_2} \frac{R_1}{R_1 + R_2} \\
+L(s) &= A \frac{R_1}{R_o + \underbrace{R_1 + R_2}_{R}}
+\end{align*}
+The transfer function for $I_o$ to $V_o$ is then the product of the gains along the forward path divided by $(1 + L(s))$
+\begin{align*}
+Z_o = \frac{V_o}{I_o}
+&=
+\frac{
+    \frac{R R_o}{R_o + R}
+}{
+    1 + L(s)
+} \\
+&=
+\frac{
+    \frac{R R_o}{R_o + R}
+}{
+    1 + A\frac{R_1}{R_o + R}
+} \\
+&=
+\frac{
+    R R_o
+}{
+    R_o + R + AR_1
+}
+\end{align*}
+** Q3
+Assuming the op-amp high-frequency open-loop gain is zero,
+i.e. $A(j\omega)|_{\omega \to \infty} = 0$, find the expression for the high-frequency output impedance $Z_o(j\omega)|_{\omega \to \infty}$ in terms of $R_o$, $R_1$, and $R_2$.
+Also, find the expression for the output impedance normalized to the high-frequency value, i.e.,
+\begin{equation*}
+\hat{Z}(s) \equiv \frac{Z_o(s)}{Z_o(j\omega)|_{\omega \to \infty}}
+\end{equation*}
+in terms of $L(s)$.
+*** Answer
+\begin{align*}
+Z_o(j\omega)|_{\omega \to \infty}
+&=
+\frac{
+    \frac{R R_o}{R_o + R}
+}{
+    1 + \cancelto{0}{[A(j\omega)|_{\omega \to \infty}]}\frac{R_1}{R_o + R}
+} \\
+&= \frac{R R_o}{R_o + R}
+\end{align*}
+
+The normalized impedance is then:
+\begin{align*}
+\hat{Z}(s)
+&=
+\frac{Z_o(s)}{Z_o(j\omega)|_{\omega \to \infty}} \\
+&=
+\frac{
+    \left[
+    \frac{
+        \frac{R R_o}{R_o + R}
+    }{
+        1 + L(s)
+    }
+    \right]
+}{
+    \left[
+    \frac{R R_o}{R_o + R}
+    \right]
+} \\
+&=
+\frac{1}{1 + L(s)}
+\end{align*}
+** Q4
+Using MATLAB, draw the Bode plots of $L(s)$ and $\hat{Z}(s)$ for
+\begin{align*}
+R_o &= \SI{50}{\ohm} &
+R_1 &= \SI{1}{\kilo\ohm} &
+R_2 &= \SI{1}{\kilo\ohm} &
+A(s) &=
+\frac{10^4}{(s + 1)(0.001s + 1)}
+\end{align*}
+on the same graph.
+Find the gain crossover frequency $\omega_c$ and phase margin $\phi_m$ of $L(s)$,
+and also find the cutoff frequency $\omega_l$ where $|\hat{Z}(j\omega_l)| = 0.707 (\SI{-3}{\decibel})$.
+Discuss how the shapes of $|L(j\omega)|$ and $|\hat{Z}(j\omega)|$ are related at frequencies below $\omega_c$.
+*** Answer
+Defining our given variables:
+#+begin_src matlab :session :results output code :exports both
+s = tf('s');
+R_o = 50;  % ohm
+R_1 = 1000;  % ohm
+R_2 = 1000;  % ohm
+R = R_1 + R_2;
+A = (10^4)/((s + 1)*(0.001*s + 1));
+
+L = A*R_1/(R_o + R);
+Z_hat = 1/(1 + L);
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+#+end_src
+
+Let's find our frequency response:
+#+begin_src matlab :session :results output code :exports both
+% Conveniently bode() gives the same wout for both functions
+[L_mag, L_phase, L_wout] = bode(L);
+[Z_mag, Z_phase, Z_wout] = bode(Z_hat);
+L_mag = 20*log10(reshape(L_mag, [numel(L_mag) 1]));
+L_phase = reshape(L_phase, [numel(L_phase) 1]);
+Z_mag = 20*log10(reshape(Z_mag, [numel(Z_mag) 1]));
+Z_phase = reshape(Z_phase, [numel(Z_phase) 1]);
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+#+end_src
+
+Finding the margin properties of $L(s)$:
+#+begin_src matlab :session :results output code :exports both
+[~ , pm, ~, wc] = margin(L);
+pm  % phase margin, deg
+wc  % gain crossover frequency, rad/s
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+pm =
+   25.5087
+wc =
+   2.0983e+03
+#+end_src
+
+Finding the cutoff frequency $\omega_l$ of $\hat{Z}$:
+#+begin_src matlab :session :results output code :exports both
+wl = getGainCrossover(Z_hat, 1/sqrt(2))  % rad/s
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+wl =
+   1.3724e+03
+#+end_src
+
+Plotting the Bode plots:
+#+begin_src matlab :session :results file :exports both
+f_name = 'bode_problem1.svg'
+fig = figure('visible', 'off',...
+            'Position', [0 0 600 600]);
+ax1 = subplot(2, 1, 1);
+semilogx(L_wout, L_mag, Z_wout, Z_mag);
+hold on;
+plot([min(L_wout), wc], [0, 0], 'm-.');
+plot([min(L_wout), wl], [-3, -3], 'm--');
+plot([wc, wc], [-100, 0], 'r');
+plot([wl, wl], [-100, -3], 'g');
+hold off;
+ylim([-100 100]);
+l1 = legend(...
+    '$L(s)$', '$\hat{Z}(s)$', ...
+    '0dB line', '-3dB line',...
+    '$\omega_c$', '$\omega_l$');
+set(l1, 'Interpreter', 'none',...
+        'color', 'none', 'edgecolor', 'none',...
+        'Position', [1 0.7 0.04 0.15]);
+title('Bode Plot')
+ylabel('Magnitude [dB]');
+ax2 = subplot(2, 1, 2);
+semilogx(L_wout, L_phase, Z_wout, Z_phase);
+hold on;
+plot([wc, wc], [-180, -180 + pm], 'r');
+hold off;
+l2 = legend(...
+    '$L(s)$', '$\hat{Z}(s)$', ...
+    '$\phi_m$');
+set(l2, 'Interpreter', 'none',...
+        'color', 'none', 'edgecolor', 'none',...
+        'Position', [1 0.2 0.04 0.15]);
+ylabel('Phase [deg]');
+xlabel('Frequency [rad/s]');
+linkaxes([ax1, ax2], 'x');
+xlim([min(L_wout), max(L_wout)]);
+ylim([-180, 135]);
+yticks([-180:45:135]);
+saveas(fig, f_name);
+ans = f_name
+#+end_src
+
+#+RESULTS:
+[[file:bode_problem1.svg]]
+
+Below $\omega_c$, the gain plots for $L(j\omega)$ and $\hat{Z}(j\omega)$ appear to be roughly mirrored across the zero line.
+This makes sense because below $\omega_c$, $|L(j\omega)|$ starts becoming much bigger than 1, and we can then make the approximation:
+\begin{align*}
+20\log_{10}|L(j\omega)|
+&\approx
+-20\log_{10}|\hat{Z}(j\omega)| & \omega < \omega_c \\
+20\log_{10}|L(j\omega)|
+&\approx
+-20\log_{10}
+\left|
+\frac{1}{1 + L(j\omega)}
+\right| \\
+&\approx
+-20\log_{10}
+\left|
+\frac{1}{L(j\omega)}
+\right| \\
+&\approx
+-20\log_{10}
+\left|
+L(j\omega)^{-1}
+\right| \\
+&\approx
+20\log_{10}
+|L(j\omega)|
+\end{align*}
+** Q5
+Find the output DC impedance $Z_o(j\omega)|_{\omega=0}$
+*** Answer
+\begin{align*}
+A(j\omega)|_{\omega=0}
+&=
+\frac{10^4}{(j\cancelto{0}{\omega} + 1)(0.001j\cancelto{0}{\omega} + 1)} \\
+&= 10^4 \\
+Z_o(j\omega)|_{\omega=0}
+&=
+\frac{
+    R R_o
+}{
+    R_o + R + A(j\omega)|_{\omega=0}R_1
+}
+\end{align*}
+Plugging in our values:
+#+begin_src matlab :session :results output code :exports both
+A_0 = 10^4;
+Z_o0 = (R*R_o)/(R_o + R+ A_0*R_1)  % ohm
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+Z_o0 =
+    0.0100
+#+end_src
+
+* Problem 2
+Let us consider a brushed DC motor driven by a voltage amplifier shown in Figure [[fig:fig2]].
+Here,
+$L_m$ is the winding inductance,
+$R_m$ is the winding resistance,
+$J_m$ is the rotor rotational inertia, and
+$K_t is the motor torque constant.
+There is a wheel mounted on the motor shaft, whose rotational inertia is $J_w$.
+On the current return path, there is a shunt resistor $R_s$ to measure the current through the motor winding.
+
+#+NAME: fig:fig2
+#+CAPTION: Brushed DC motor driven by an op-amp circuit.
+#+ATTR_LATEX: :width 0.9\textwidth
+[[file:fig2.svg]]
+
+** Q1
+Find the electrical impedance $Z_{eq}(s)$ looking into the electrical port of the motor.
+*** Answer
+asdf
+** Q2
+Draw an equivalent circuit diagram where all mechanical elements are referred to the electrical domain as passive electrical elements.
+Find the parameter(s) of the equivalent circuit element(s) in terms of $L_m$, $R_m$, $J_m$, $K_t$, and $J_w$.
+*** Answer
+asdf
+** Q3
+Find the analytic expression for the transconductance from $V_r(s)$ to $I_o(s)$.
+Then, draw the Bode plot of $I_o(s)/V_r(s)$ using MATLAB for
+\begin{align*}
+A(s) &= \frac{10^7}{s} &
+R_1 &= \SI{1}{\kilo\ohm} &
+R_2 &= \SI{9}{\kilo\ohm} \\
+R_m &= \SI{4.8}{\ohm} &
+L_m &= \SI{1}{\milli\henry} &
+R_s &= \SI{0.2}{\ohm} \\
+K_t &= \SI{250}{\milli\newton\meter\per\ampere} &
+J_m &= \SI{1}{\kilo\gram\centi\meter^2} &
+J_w &= \SI{9}{\kilo\gram\centi\meter^2}
+\end{align*}
+*** Answer
+adsf
+** Q4
+Let us assume that the shunt resistor $R_s$ is rated for $\SI{1}{\watt}$ power.
+That is, the resistor fails when it dissipates more than $\SI{1}{\watt}$.
+What is the maximum rms current $I_{o,\text{rms}} allowed for the shunt resistor?
+*** Answer
+asdf
+** Q5
+Let the input voltage $V_r$ be sinusoidal at $\SI{50}{\hertz}$.
+What is the maximum rms voltage $V_{r,rms}$ that the shunt resistor can accommodate for its power rating?
+*** Answer
+asdf
+
+
+
+
+
+
