@@ -1,0 +1,168 @@
+EESchema Schematic File Version 4
+EELAYER 30 0
+EELAYER END
+$Descr A4 11693 8268
+encoding utf-8
+Sheet 1 1
+Title ""
+Date ""
+Rev ""
+Comp ""
+Comment1 ""
+Comment2 ""
+Comment3 ""
+Comment4 ""
+$EndDescr
+$Comp
+L Device:Opamp_Dual_Generic U1
+U 1 1 6025B631
+P 3100 1750
+F 0 "U1" H 3100 2117 50  0001 C CNN
+F 1 "A(s)" H 3050 1750 50  0000 C CNN
+F 2 "" H 3100 1750 50  0001 C CNN
+F 3 "~" H 3100 1750 50  0001 C CNN
+	1    3100 1750
+	1    0    0    -1  
+$EndComp
+$Comp
+L pspice:VSOURCE V1
+U 1 1 6025D45D
+P 2150 1950
+F 0 "V1" H 2378 1996 50  0001 L CNN
+F 1 "V_r" H 2400 1950 50  0000 L CNN
+F 2 "" H 2150 1950 50  0001 C CNN
+F 3 "~" H 2150 1950 50  0001 C CNN
+	1    2150 1950
+	1    0    0    -1  
+$EndComp
+$Comp
+L power:GND #PWR01
+U 1 1 6025E64E
+P 2150 2250
+F 0 "#PWR01" H 2150 2000 50  0001 C CNN
+F 1 "GND" H 2155 2077 50  0000 C CNN
+F 2 "" H 2150 2250 50  0001 C CNN
+F 3 "" H 2150 2250 50  0001 C CNN
+	1    2150 2250
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	2800 1650 2150 1650
+$Comp
+L Device:R R1
+U 1 1 6025ECE4
+P 3050 2200
+F 0 "R1" V 2935 2200 50  0001 C CNN
+F 1 "R_2" V 2935 2200 50  0000 C CNN
+F 2 "" V 2980 2200 50  0001 C CNN
+F 3 "~" H 3050 2200 50  0001 C CNN
+	1    3050 2200
+	0    1    1    0   
+$EndComp
+$Comp
+L Device:R R3
+U 1 1 6025F311
+P 2650 2350
+F 0 "R3" H 2580 2304 50  0001 R CNN
+F 1 "R_1" H 2580 2350 50  0000 R CNN
+F 2 "" V 2580 2350 50  0001 C CNN
+F 3 "~" H 2650 2350 50  0001 C CNN
+	1    2650 2350
+	-1   0    0    1   
+$EndComp
+Wire Wire Line
+	2800 1850 2650 1850
+Wire Wire Line
+	2650 1850 2650 2200
+Wire Wire Line
+	2900 2200 2650 2200
+Connection ~ 2650 2200
+Wire Wire Line
+	3200 2200 3400 2200
+Wire Wire Line
+	3400 2200 3400 1750
+$Comp
+L power:GND #PWR02
+U 1 1 60261F00
+P 2650 2500
+F 0 "#PWR02" H 2650 2250 50  0001 C CNN
+F 1 "GND" H 2655 2327 50  0000 C CNN
+F 2 "" H 2650 2500 50  0001 C CNN
+F 3 "" H 2650 2500 50  0001 C CNN
+	1    2650 2500
+	1    0    0    -1  
+$EndComp
+$Comp
+L Device:R R2
+U 1 1 602628BA
+P 3700 1750
+F 0 "R2" V 3493 1750 50  0001 C CNN
+F 1 "R_m" V 3585 1750 50  0000 C CNN
+F 2 "" V 3630 1750 50  0001 C CNN
+F 3 "~" H 3700 1750 50  0001 C CNN
+	1    3700 1750
+	0    1    1    0   
+$EndComp
+Wire Wire Line
+	3400 1750 3550 1750
+Connection ~ 3400 1750
+$Comp
+L Device:L L1
+U 1 1 602630B2
+P 4150 1750
+F 0 "L1" V 4340 1750 50  0001 C CNN
+F 1 "L_m" V 4249 1750 50  0000 C CNN
+F 2 "" H 4150 1750 50  0001 C CNN
+F 3 "~" H 4150 1750 50  0001 C CNN
+	1    4150 1750
+	0    -1   -1   0   
+$EndComp
+Wire Wire Line
+	4000 1750 3850 1750
+$Comp
+L Device:C C1
+U 1 1 60264324
+P 4550 1950
+F 0 "C1" H 4665 1996 50  0001 L CNN
+F 1 "C_eq" H 4665 1950 50  0000 L CNN
+F 2 "" H 4588 1800 50  0001 C CNN
+F 3 "~" H 4550 1950 50  0001 C CNN
+	1    4550 1950
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	4300 1750 4550 1750
+Wire Wire Line
+	4550 1750 4550 1800
+$Comp
+L Device:R R?
+U 1 1 60264ECB
+P 4150 2350
+F 0 "R?" H 4080 2304 50  0001 R CNN
+F 1 "R_s" H 4080 2350 50  0000 R CNN
+F 2 "" V 4080 2350 50  0001 C CNN
+F 3 "~" H 4150 2350 50  0001 C CNN
+	1    4150 2350
+	-1   0    0    1   
+$EndComp
+Wire Wire Line
+	4550 2100 4550 2200
+Wire Wire Line
+	4550 2200 4150 2200
+$Comp
+L power:GND #PWR03
+U 1 1 60265C43
+P 4150 2500
+F 0 "#PWR03" H 4150 2250 50  0001 C CNN
+F 1 "GND" H 4155 2327 50  0000 C CNN
+F 2 "" H 4150 2500 50  0001 C CNN
+F 3 "" H 4150 2500 50  0001 C CNN
+	1    4150 2500
+	1    0    0    -1  
+$EndComp
+Text GLabel 4050 2200 0    50   Input ~ 0
+V_Io
+Wire Wire Line
+	4050 2200 4150 2200
+Connection ~ 4150 2200
+$EndSCHEMATC
