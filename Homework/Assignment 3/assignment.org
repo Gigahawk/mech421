@@ -321,7 +321,7 @@ Here,
 $L_m$ is the winding inductance,
 $R_m$ is the winding resistance,
 $J_m$ is the rotor rotational inertia, and
-$K_t is the motor torque constant.
+$K_t$ is the motor torque constant.
 There is a wheel mounted on the motor shaft, whose rotational inertia is $J_w$.
 On the current return path, there is a shunt resistor $R_s$ to measure the current through the motor winding.
 
@@ -333,12 +333,44 @@ On the current return path, there is a shunt resistor $R_s$ to measure the curre
 ** Q1
 Find the electrical impedance $Z_{eq}(s)$ looking into the electrical port of the motor.
 *** Answer
-asdf
+\begin{align*}
+Z_{eq}(s) & = \frac{V(s)}{I(s)} &
+I(s) &= \frac{V(s) - e(s)}{\underbrace{R_m + sL_m}_{Z_m}} &
+e(s) &= K_t \omega_r = K_t \dot{\theta}(s) \\
+&= \frac{V(s)Z_m}{V(s) - e(s)} \\
+&= \frac{V(s)(R_m + L_m)}{V(s) - K_t \dot{\theta}(s)}
+\end{align*}
+Technically this is already an expression using only the given variables for the motor, however it will be a lot more useful without the $\dot{\theta}$ term.
+Doing a little more algebra:
+\begin{align*}
+\tau(t) = K_t I(t) &= (\underbrace{J_m + J_w}_{J})\ddot{\theta}(t)\\
+\Lagr{K_t I(t)} &= \Lagr{J\ddot{\theta}(t)} \\
+K_t I(s) &= sJ\dot{\theta}(s) \\
+\dot{\theta}(s) &= \frac{K_t I(s)}{sJ} \\
+\\
+\frac{V(s)}{I(s)} &= \frac{V(s)Z_m}{V(s) - K_t \frac{K_t I(s)}{sJ}} \\
+\frac{1}{I(s)} &= \frac{sJ Z_m}{sJV(s) - K_t^2 I(s)} \\
+I(s) &= \frac{sJV(s) - K_t^2 I(s)}{sJ Z_m} \\
+I(s) &= \frac{V(s)}{Z_m} - \frac{K_t^2I(s)}{sJZ_m} \\
+\frac{V(s)}{Z_m} &= I(s) + \frac{K_t^2I(s)}{sJZ_m} \\
+\frac{V(s)}{I(s)} &= Z_m + \frac{K_t^2}{sJ} \\
+Z_{eq}(s) &= R_m + sL_m + \frac{K_t^2}{s(J_m + J_w)}
+\end{align*}
+
 ** Q2
 Draw an equivalent circuit diagram where all mechanical elements are referred to the electrical domain as passive electrical elements.
 Find the parameter(s) of the equivalent circuit element(s) in terms of $L_m$, $R_m$, $J_m$, $K_t$, and $J_w$.
 *** Answer
-asdf
+The winding impedance for the resistor and inductor are expressed by $R_m$ and $L_m$ terms directly, and the impedance of the transducer element follows the form of a capacitor:
+\begin{align*}
+Z_{C_{eq}}(s) = \frac{1}{sC_{eq}} &= \frac{K_t^2}{sJ} \\
+C_{eq} &= \frac{J}{K_t^2} = \frac{J_m + J_w}{K_t^2}
+\end{align*}
+The equivalent circuit is then:
+#+NAME: fig:q2sch
+#+CAPTION: Equivalent electrical domain schematic.
+#+ATTR_LATEX: :width 0.8\textwidth
+[[file:q2sch.svg]]
 ** Q3
 Find the analytic expression for the transconductance from $V_r(s)$ to $I_o(s)$.
 Then, draw the Bode plot of $I_o(s)/V_r(s)$ using MATLAB for
@@ -354,18 +386,157 @@ J_m &= \SI{1}{\kilo\gram\centi\meter^2} &
 J_w &= \SI{9}{\kilo\gram\centi\meter^2}
 \end{align*}
 *** Answer
-adsf
+First we define the loop transfer function $L(s)$ for the voltage amplifier portion of the circuit:
+\begin{equation*}
+L(s) = A(s)\frac{R_1}{\underbrace{R_1 + R_2}_{R}}
+\end{equation*}
+Now we can find the voltage transfer function of the amplifier $V_o(s)/V_r(s)$:
+\begin{align*}
+\frac{V_o(s)}{V_r(s)} &= \frac{A(s)}{1 + L(s)}
+\end{align*}
+Next, finding the transfer function $I_o(s)/V_o(s)$:
+\begin{align*}
+V_o(s) &= I_o(s) Z_\text{total}(s) \\
+\frac{I_o(s)}{V_o(s)} &= \frac{1}{Z_\text{total}(s)} \\
+&=
+\frac{1}{Z_{eq}(s) + R_s}
+\end{align*}
+Multiplying everything together we get:
+\begin{equation*}
+\frac{I_o(s)}{V_r(s)}
+&=
+\frac{A(s)}{(1 + L(s))(Z_{eq}(s) + R_s)}
+\end{equation*}
+
+Plugging into MATLAB:
+#+begin_src matlab :session :results output code :exports both
+s = tf('s');
+A = 10^7/s;
+R_1 = 1000;  % ohm
+R_2 = 9000;  % ohm
+R_m = 4.8;  % ohm
+L_m = 0.001;  % H
+R_s = 0.2;  % ohm
+K_t = 0.25;  % Nm/A
+J_m = 0.0001;  % kgm^2
+J_w = 0.0009;  % kgm^2
+
+R = R_1 + R_2;
+J = J_m + J_w;
+Z_m = R_m + s*L_m;
+Z_eq = Z_m + (K_t^2)/(s*J);
+L = A*R_1/R;
+G1 = A/(1 + L);
+G2 = 1/(Z_eq + R_s);
+G = G1*G2
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+G =
+ 
+                   1e08 s^2
+  -------------------------------------------
+  0.01 s^4 + 10050 s^3 + 5e07 s^2 + 6.25e08 s
+ 
+Continuous-time transfer function.
+#+end_src
+Plotting the Bode plot:
+#+begin_src matlab :session :results file :exports both
+f_name = 'bode_problem2.svg'
+fig = figure('visible', 'off',...
+            'Position', [0 0 600 600]);
+bode(G)
+saveas(fig, f_name);
+ans = f_name
+#+end_src
+
+#+RESULTS:
+[[file:bode_problem2.svg]]
+
 ** Q4
 Let us assume that the shunt resistor $R_s$ is rated for $\SI{1}{\watt}$ power.
 That is, the resistor fails when it dissipates more than $\SI{1}{\watt}$.
-What is the maximum rms current $I_{o,\text{rms}} allowed for the shunt resistor?
+What is the maximum rms current $I_{o,\text{rms}}$ allowed for the shunt resistor?
 *** Answer
-asdf
+Assuming the rating is for continuous dissipation (i.e. the resistor rated to generate $\SI{1}{\watt}$ of power continuously, or at DC), and neglecting non-ideal effects (stray inductance, skin effect, etc.) then we can find the max rms current using:
+\begin{align*}
+P_\text{maxDC} &= R_s I^2_\text{maxDC} \\
+I_\text{maxRMS} =
+I_\text{maxDC} &= \sqrt{\frac{P_\text{maxDC}}{R_s}}
+\end{align*}
+Plugging into MATLAB:
+#+begin_src matlab :session :results output code :exports both
+P_maxDC = 1;  % W
+I_maxRMS1 = sqrt(P_maxDC/R_s)
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+I_maxRMS1 =
+    2.2361
+#+end_src
+
+If however, the power rating is for instantaneous dissipation[fn:instantaneous] (i.e. the resistor will fail as soon as the power dissapation exceeds $\SI{1}{\watt}$), we need to divide the value by $\sqrt{2}$
+\begin{align*}
+P_\text{maxPeak} &= R_s I^2_\text{maxPeak} \\
+I_\text{maxPeak} &= \sqrt{\frac{P_\text{maxPeak}}{R_s}} \\
+I_\text{maxRMS} &= \frac{I_\text{maxPeak}}{\sqrt{2}}
+\end{align*}
+#+begin_src matlab :session :results output code :exports both
+P_maxPeak = 1;  % W
+I_maxRMS2 = sqrt(P_maxPeak/R_s)/sqrt(2)
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+I_maxRMS2 =
+    1.5811
+#+end_src
+
+
+[fn:instantaneous] A single instantaneous rating like this is fairly uncommon for resistors.
+More commonly it seems ratings for transient current overloads are rated in maximum energy dissapated over some period of time during which overload is occuring (i.e. within a period of $\SI{0.01}{\second}$, the resistor can dissapate $\SI{5}{\joule}$ before failing).
+
+
+
+
+
+
 ** Q5
 Let the input voltage $V_r$ be sinusoidal at $\SI{50}{\hertz}$.
 What is the maximum rms voltage $V_{r,rms}$ that the shunt resistor can accommodate for its power rating?
 *** Answer
-asdf
+First let's get the gain of $I_o(s)/V_r(s)$ at $\SI{50}{\hertz}$.
+#+begin_src matlab :session :results output code :exports both
+f_op = 50;  % hz
+omega_op = 2*pi*f_op  % rad/s
+[mag_op, ~] = bode(G, omega_op)
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+omega_op =
+  314.1593
+mag_op =
+    1.9995
+#+end_src
+$V_{r,\text{maxRMS}}$ is then
+#+begin_src matlab :session :results output code :exports both
+V_maxRMS1 = I_maxRMS1/mag_op  % V
+V_maxRMS2 = I_maxRMS2/mag_op  % V
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+V_maxRMS1 =
+    1.1183
+V_maxRMS2 =
+    0.7908
+#+end_src
+
+depending on the meaning of the $\SI{1}{\watt}$ limit.
+
 
 
 
