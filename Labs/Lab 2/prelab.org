@@ -1,0 +1,551 @@
+#+TITLE: MECH 421 Prelab 2
+#+AUTHOR: Jasper Chan - 37467164
+
+#+OPTIONS: toc:nil
+
+#+LATEX_HEADER: \definecolor{bg}{rgb}{0.95,0.95,0.95}
+#+LATEX_HEADER: \setminted{frame=single,bgcolor=bg,samepage=true}
+#+LATEX_HEADER: \setlength{\parindent}{0pt}
+#+LATEX_HEADER: \usepackage{float}
+#+LATEX_HEADER: \usepackage{svg}
+#+LATEX_HEADER: \usepackage{cancel}
+#+LATEX_HEADER: \usepackage{amssymb}
+#+LATEX_HEADER: \usepackage{mathtools, nccmath}
+#+LATEX_HEADER: \sisetup{per-mode=fraction}
+#+LATEX_HEADER: \newcommand{\Lwrap}[1]{\left\{#1\right\}}
+#+LATEX_HEADER: \newcommand{\Lagr}[1]{\mathcal{L}\Lwrap{#1}}
+#+LATEX_HEADER: \newcommand{\Lagri}[1]{\mathcal{L}^{-1}\Lwrap{#1}}
+#+LATEX_HEADER: \newcommand{\Ztrans}[1]{\mathcal{Z}\Lwrap{#1}}
+#+LATEX_HEADER: \newcommand{\Ztransi}[1]{\mathcal{Z}^{-1}\Lwrap{#1}}
+#+LATEX_HEADER: \newcommand{\ZOH}[1]{\text{ZOH}\left(#1\right)}
+#+LATEX_HEADER: \DeclarePairedDelimiter{\ceil}{\lceil}{\rceil}
+#+LATEX_HEADER: \makeatletter \AtBeginEnvironment{minted}{\dontdofcolorbox} \def\dontdofcolorbox{\renewcommand\fcolorbox[4][]{##4}} \makeatother
+
+#+LATEX_HEADER: \renewcommand\arraystretch{1.2}
+
+#+begin_src elisp :session :exports none
+(org-babel-tangle)
+#+end_src
+
+#+RESULTS:
+| frac_fit.m |
+
+#+begin_src ipython :session :results raw drawer :exports none
+import numpy as np
+import pandas as pd
+import os
+from matplotlib import pyplot as plt
+from sympy import Symbol
+from PySpice.Spice.Netlist import Circuit, SubCircuitFactory
+from PySpice.Spice.Library import SpiceLibrary
+from PySpice.Plot.BodeDiagram import bode_diagram
+from IPython.display import set_matplotlib_formats
+import shutil
+%matplotlib inline
+set_matplotlib_formats('svg')
+#+end_src
+
+#+RESULTS:
+:results:
+# Out[10]:
+:end:
+
+#+begin_src ipython :session :results raw drawer :exports none
+import IPython
+from tabulate import tabulate
+
+class OrgFormatter(IPython.core.formatters.BaseFormatter):
+    def __call__(self, obj):
+        if(isinstance(obj, list)):
+            return None
+        if(isinstance(obj, str)):
+            return None
+        if(isinstance(obj, pd.core.indexes.base.Index)):
+            return None
+        try:
+            return tabulate(obj, headers='keys',
+                            tablefmt='orgtbl', showindex=False)
+        except:
+            return None
+
+ip = get_ipython()
+ip.display_formatter.formatters['text/org'] = OrgFormatter()
+#+end_src
+
+#+RESULTS:
+:results:
+# Out[11]:
+:end:
+
+#+NAME: fig:lab_circuit
+#+ATTR_LATEX: :width 0.9\textwidth
+#+CAPTION: Circuit diagram of lab setup.
+[[file:lab_circuit.svg]]
+
+* Q1
+For $Z_1 = \SI{2.2}{\kilo\ohm}$ and $Z_2 = \SI{22}{\kilo\ohm}$, draw a block diagram of the voltage stage that shows the relation between the input voltage $V_r$ and output voltage $V_o$
+** Answer
+#+begin_src matlab :session :results none :exports none :eval never-export
+simulink
+#+end_src
+#+begin_src matlab :session :results none :exports none
+format short eng
+#+end_src
+From prelab 1, we assumed that the PA13 had a negligible output impedance $R_o = 0$ since it is not mentioned in the datasheet.
+The block diagram is then:
+#+begin_src matlab :session :results output code :exports both
+s = fotf('s');
+% From Prelab 1
+A_PA = (5.5245e+08)/(s^1.2301+2531.8);
+Z_1 = 2.2e+3;  % ohm
+Z_2 = 22e+3;  % ohm
+f = Z_1/(Z_1 + Z_2);
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+#+end_src
+
+#+begin_src matlab :session :results none :exports code
+open_system('G_cl_PA');
+print -dsvg -s 'G_cl_PA.svg';
+#+end_src
+
+#+begin_src shell :exports results :results file
+inkscape G_cl_PA.svg --export-text-to-path --export-plain-svg -o G_cl_PA_fixed.svg
+printf 'G_cl_PA_fixed.svg'
+#+end_src
+
+#+RESULTS:
+[[file:G_cl_PA_fixed.svg]]
+
+* Q2
+Draw a block diagram of the whole system that shows the relation between the current-reference voltage $V_{Ir}$ and current-sensing voltage $V_{Io}$.
+
+** Answer
+The OP27 has double the gain bandwidth product of the PA13, which means that we can consider the OP27 to be an ideal op-amp a across the operational bandwidth of the entire circuit.
+The block diagram can then be expressed as:
+#+begin_src matlab :session :results output code :exports both
+% Values from prelab1
+R_s = 0.2;  % ohm
+R_m = 3;  % ohm
+L_m = 1e-3;  % H
+Z_mot = R_s + R_m + L_m*s;
+% Picking arbitrary values of the remaining impedances so
+% that the model loads correctly
+Z_3 = 1;
+Z_4 = 1;
+Z_5 = 1;
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+#+end_src
+
+#+begin_src matlab :session :results none :exports code
+open_system('G_cl_circuit');
+print -dsvg -s 'G_cl_circuit.svg';
+#+end_src
+
+#+begin_src shell :exports results :results file
+inkscape G_cl_circuit.svg --export-text-to-path --export-plain-svg -o G_cl_circuit_fixed.svg
+printf 'G_cl_circuit_fixed.svg'
+#+end_src
+
+#+RESULTS:
+[[file:G_cl_circuit_fixed.svg]]
+
+* Q3
+Current controller design: select appropriate values for $Z_3$, $Z_4$, and $Z_5$ to design a current controller that meets the following specificatoins.
+- $Z_3$, $Z_4$, $Z_5$ consist of resistors and/or capacitors.
+  The resistors in stock are from $\SI{10}{\ohm}$ to $\SI{1}{\mega\ohm}$ in standard increments.
+  The capacitors are from $\SI{100}{\pico\farad}$ to $\SI{4.7}{\micro\farad}$.
+- The DC gain of $V_{Io}/V_{Ir}$ is $\SI{0.2}{\volt\per\volt}$
+- The closed-loop bandwidth of $V_{Io}/V_{Ir}$ should be greater than $\SI{5}{\kilo\hertz}$.
+- The step response of $V_{Io}/V_{Ir}$ should have zero steady state error.
+- The loop should have a phase margin of at least $\SI{60}{\degree}$
+** Answer
+*** DC Gain
+Using Black's formula, the transfer function through the outer loop of the block diagram can be expressed as:
+\begin{align*}
+G_\text{outerloop}
+&=
+\frac
+{G_\text{fwd}}
+{1 + \underbrace{G_\text{fwd}G_\text{ret}}_{L(s)}} \\
+&=
+\frac
+{G_\text{fwd}}
+{1 + G_\text{fwd}\frac{R_s}{Z_5}} \\
+\end{align*}
+If we assume that $\lim_{\omega \to 0} L(j\omega)$ is infinite (or very large) and that $G_\text{ret}$ is a constant (i.e. not a function of $s$), we can make the approximation:
+\begin{align*}
+\lim_{\omega \to 0} G_\text{outerloop}(j\omega)
+&=
+\frac
+{1}
+{\frac{R_s}{Z_5}} \\
+&=
+\frac{Z_5}{R_s}
+\end{align*}
+The DC gain of the system is then:
+\begin{align*}
+\text{DC Gain} = 
+\lim_{\omega \to 0}
+|G_{cl}(j\omega)|
+&=
+\lim_{\omega \to 0}
+\left|
+\frac{-1}{Z_3}
+G_\text{outerloop}(j\omega)
+R_s
+\right| \\
+&=
+\left|
+\frac{-1}{Z_3}
+\frac{Z_5}{R_s}
+R_s
+\right| \\
+&=
+\frac{Z_5}{Z_3}
+\end{align*}
+
+In order for our block diagram to be representative of the behavior of the real system $Z_5 \gg R_s$, so let's pick $Z_5$ and $Z_3$ to be in the \si{\kilo\ohm} range.
+Picking $Z_5 = \SI{2}{\kilo\ohm}$ and $Z_3 = \SI{10}{\kilo\ohm}$ we get a DC gain of 0.2.
+#+begin_src matlab :session :results output code :exports both
+Z_3 = 10e+3;  % ohm
+Z_5 = 2e+3;  % ohm
+Z_5/Z_3
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+ans =
+   200.0000e-003
+#+end_src
+
+*** Loop Shaping
+Let's first plot the outer loop $L(s)$ without $Z_4$ (i.e. $Z_4 = 1$).
+#+begin_src matlab :session :results output code :exports both
+G_PA_cl = A_PA/(1 + A_PA*f);
+forward_uncomp = G_PA_cl*(1/Z_mot);
+L_uncomp = forward_uncomp*(R_s/Z_5);
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+#+end_src
+
+#+begin_src matlab :session :results file :exports both
+f_name = 'loop_bode_uncomp.svg'
+fig = figure('visible', 'off',...
+            'Position', [0 0 600 600]);
+freq = logspace(1, 8, 100000);
+bode(L_uncomp, freq);
+saveas(fig, f_name);
+ans = f_name;
+#+end_src
+
+#+RESULTS:
+[[file:loop_bode_uncomp.svg]]
+
+We can see that the overall gain is really low, and that there is a flat slope at low frequencies.
+In order for our earlier assumption $\lim_{\omega \to 0} L(j\omega) = \infty$ to be reasonable, we should both increase the overall gain of the loop as well as add a negative slope at lower frequencies.
+We can do this with a PI controller, where past the controller break frequency $\omega_i$ it provides a static gain, and below that there is an integral action.
+The transfer function is of the form:
+\begin{align*}
+G_{PI}(s)
+&=
+K_p + K_i\frac{1}{s} \\
+&=
+K_p\left(1 + \frac{K_i}{K_p}\frac{1}{s}\right) \\
+&=
+K_p\left(1 + \frac{\omega_i}{s}\right)
+=
+K_p\left(1 + \frac{1}{T_i s}\right)
+\end{align*}
+We can implement this in $Z_4$ with a series capacitor and resistor giving us:
+\begin{align*}
+Z_4(s)
+&=
+\underbrace{R_4}_{K_p}
+\left(
+1 +
+\frac{1}
+{\underbrace{R_4 C_4}_{T_i} s}
+\right)
+\end{align*}
+
+First, let's identify the frequency where our loop has a phase margin of $\SI{60}{\degree}$.
+#+begin_src matlab :session :results output code :exports both
+[mag, phase, wout] = bode(L_uncomp, freq);
+mag = squeeze(mag);
+phase = squeeze(phase);
+w_c_max = interp1(phase, wout, -180 + 60);  % rad/s
+w_c_max/(2*pi)  % Hz
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+ans =
+   167.5696e+003
+#+end_src
+
+This is considerably higher than our bandwidth requirement of $\SI{5}{\kilo\hertz}$.
+Let's try to get $\omega_c \approx \SI{10}{\kilo\hertz}$ so that we have some margin over the minimum required specificications.
+#+begin_src matlab :session :results output code :exports both
+w_c_raw = 2*pi*10e3;  % rad/s
+K_c_uncomp = interp1(wout, mag, w_c_raw);
+R_4_raw = 1/K_c_uncomp
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+R_4_raw =
+    56.8816e+003
+#+end_src
+
+Let's pick $R_4 = \SI{56}{\kilo\ohm}$
+#+begin_src matlab :session :results output code :exports both
+R_4 = 56e3  % ohm
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+R_4 =
+    56.0000e+003
+#+end_src
+
+Now we want to set $\omega_i \approx \frac{\omega_c}{10} \approx  \SI{1}{\kilo\hertz}$:
+#+begin_src matlab :session :results output code :exports both
+w_i_raw = w_c_raw/10;  % rad/s
+C_4_raw = 1/(R_4*w_i_raw)  % F
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+C_4_raw =
+     2.8421e-009
+#+end_src
+
+Let's pick $C_4 = \SI{2700}{\pico\farad}$
+#+begin_src matlab :session :results output code :exports both
+C_4 = 2700e-12  % F
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+C_4 =
+     2.7000e-009
+#+end_src
+
+Now we can set up $Z_4$ and our compensated loop:
+#+begin_src matlab :session :results output code :exports both
+Z_4 = R_4*(1 + 1/(R_4*C_4*s));
+forward = Z_4*forward_uncomp;
+L = Z_4*L_uncomp;
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+#+end_src
+
+*** Verification
+Now we can verify the specifications of our system.
+Defining the overall system:
+#+begin_src matlab :session :results output code :exports both
+G_cl = -1/Z_3*(forward/(1 + L))*R_s;
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+#+end_src
+
+The DC gain of the system is:
+#+begin_src matlab :session :results output code :exports both
+dc_gain = dcgain(G_cl)
+dc_gain_db = 20*log10(abs(dc_gain))
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+dc_gain =
+  -200.0000e-003
+dc_gain_db =
+   -13.9794e+000
+#+end_src
+
+The bandwidth of the system is:
+#+begin_src matlab :session :results output code :exports both
+% FOMCON doesn't implement bandwidth, we have to do it manually
+[mag, phase] = bode(G_cl, freq);
+mag = 20*log10(squeeze(mag));
+phase = squeeze(phase);
+bw = interp1(mag, freq, mag(1) - 3)  % rad/s
+bw_hz = bw/(2*pi)  % Hz
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+bw =
+    66.3622e+003
+bw_hz =
+    10.5619e+003
+#+end_src
+
+The step response steady state error[fn:floatingpoint]:
+#+begin_src matlab :session :results output code :exports both
+% Because we are using a fractional integrator model for the PA13
+% analytically calculating the steady state error is rather difficult,
+% so we just simulate the step response instead.
+[y, ~] = step(G_cl);
+ss_err = dc_gain - y(end)
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+ss_err =
+  -693.8894e-018
+#+end_src
+
+[fn:floatingpoint] The calculated error is not exactly zero probably due to limits of precision with floating point calculations.
+The real system as configured likely has zero steady state error.
+
+
+
+
+
+The phase margin of the loop is:
+#+begin_src matlab :session :results output code :exports both
+[mag, phase] = bode(L, freq);
+[gm, pm, wg, wc] = margin(mag, phase, freq);
+pm  % deg
+wc  % rad/s
+fc = wc/(2*pi)  % Hz
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+pm =
+    86.0295e+000
+wc =
+    62.2009e+003
+fc =
+     9.8996e+003
+#+end_src
+
+* Q4
+Based on your selected $Z_3$, $Z_4$, and $Z_5$, draw the Bode plot and step response of $V_{Io}/V_{Ir}$.
+
+** Answer
+First computing the bandwidth of the PA13 loop:
+#+begin_src matlab :session :results output code :exports both
+[mag, ~] = bode(G_PA_cl, freq);
+mag = 20*log10(squeeze(mag));  % dB
+dc_gain = mag(1);
+bw_lim = dc_gain - 3;
+[~, bw_idx] = min(abs(mag-bw_lim));
+bw_PA = interp1(mag, freq, mag(1) - 3)  % rad/s
+bw_PA_hz = bw/(2*pi)  % Hz
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+bw_PA =
+     2.4112e+006
+bw_PA_hz =
+    10.5619e+003
+#+end_src
+
+Plotting the bode plot:
+#+begin_src matlab :session :results file :exports results
+f_name = 'G_cl_bode.svg'
+fig = figure('visible', 'off',...
+            'Position', [0 0 600 400]);
+[mag, phase] = bode(G_cl, freq);
+mag = 20*log10(squeeze(mag));
+phase = squeeze(phase);
+mag_wc2 = interp1(freq, mag, bw_PA);
+ax1 = subplot(2, 1, 1);
+semilogx(freq, mag);
+hold on;
+plot([min(freq), bw], [dc_gain_db - 3, dc_gain_db - 3], 'k--');
+plot([bw, bw], [min(mag), dc_gain_db - 3], 'r');
+plot([bw_PA, bw_PA], [min(mag), mag_wc2], 'g');
+hold off;
+ylim([min(mag) ceil(max(mag)/10)*10+10]);
+l1 = legend(...
+    '$L(s)$', ...
+    '-3dB line', ...
+    sprintf('$\\omega_{c1}$ = %.2e', bw),...
+    sprintf('$\\omega_{c2}$ = %.2e', bw_PA));
+set(l1, 'Interpreter', 'none',...
+        'color', 'none', 'edgecolor', 'none',...
+        'Location', 'west');
+% Put tick for DC gain
+mag_ticks = [-120:20:0];
+mag_ticks(mag_ticks==-20) = [];
+mag_ticks(end + 1) = dc_gain_db
+mag_ticks = sort(mag_ticks);
+yticks(mag_ticks);
+title('Bode Plot')
+ylabel('Magnitude [dB]');
+ax2 = subplot(2, 1, 2);
+semilogx(freq, phase);
+hold on;
+plot([min(freq), max(freq)], [-180, -180], 'k--');
+plot([wc, wc], [-180, -180 + pm], 'r');
+hold off;
+l2 = legend(...
+    '$L(s)$', '$-180^\circ$ line', '$\phi_m$');
+set(l2, 'Interpreter', 'none',...
+        'color', 'none', 'edgecolor', 'none',...
+        'Location', 'west');
+ylabel('Phase [deg]');
+xlabel('Frequency [rad/s]');
+linkaxes([ax1, ax2], 'x');
+xlim([min(freq), max(freq)]);
+
+saveas(fig, f_name);
+ans = f_name;
+#+end_src
+
+#+RESULTS:
+[[file:G_cl_bode.svg]]
+#+begin_src matlab :session :results file :exports both
+f_name = 'G_cl_step.svg'
+fig = figure('visible', 'off',...
+            'Position', [0 0 600 300]);
+step(G_cl, linspace(0,0.001, 1000))
+xlim([0, 0.0002]);
+ylim([-0.25, 0]);
+
+saveas(fig, f_name);
+ans = f_name;
+#+end_src
+
+#+RESULTS:
+[[file:G_cl_step.svg]]
+
+
+The exact values of $\omega_c$ and $\phi_m$ are:
+#+begin_src matlab :session :results output code :exports both
+wc  % rad/s
+fc = wc/(2*pi)  % Hz
+pm  % deg
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+wc =
+    62.2009e+003
+fc =
+     9.8996e+003
+pm =
+    86.0295e+000
+#+end_src
+
+
+
+
+
