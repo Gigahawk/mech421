@@ -23,13 +23,6 @@
 
 #+LATEX_HEADER: \renewcommand\arraystretch{1.2}
 
-#+begin_src elisp :session :exports none
-(org-babel-tangle)
-#+end_src
-
-#+RESULTS:
-| frac_fit.m |
-
 #+begin_src ipython :session :results raw drawer :exports none
 import numpy as np
 import pandas as pd
@@ -47,7 +40,7 @@ set_matplotlib_formats('svg')
 
 #+RESULTS:
 :results:
-# Out[10]:
+# Out[1]:
 :end:
 
 #+begin_src ipython :session :results raw drawer :exports none
@@ -74,7 +67,7 @@ ip.display_formatter.formatters['text/org'] = OrgFormatter()
 
 #+RESULTS:
 :results:
-# Out[11]:
+# Out[2]:
 :end:
 
 #+NAME: fig:lab_circuit
@@ -306,8 +299,8 @@ R_4_raw =
 #+end_src
 
 Let's pick $R_4 = \SI{56}{\kilo\ohm}$
-#+begin_src matlab :session :results output code :exports both
-R_4 = 56e3  % ohm
+#+begin_src matlab :session :results output code :exports code
+R_4 = 56e3;  % ohm
 #+end_src
 
 #+RESULTS:
@@ -329,8 +322,8 @@ C_4_raw =
 #+end_src
 
 Let's pick $C_4 = \SI{2700}{\pico\farad}$
-#+begin_src matlab :session :results output code :exports both
-C_4 = 2700e-12  % F
+#+begin_src matlab :session :results output code :exports code
+C_4 = 2700e-12;  % F
 #+end_src
 
 #+RESULTS:
@@ -399,7 +392,8 @@ The step response steady state error[fn:floatingpoint]:
 % analytically calculating the steady state error is rather difficult,
 % so we just simulate the step response instead.
 [y, ~] = step(G_cl);
-ss_err = dc_gain - y(end)
+ss_val = y(end);
+ss_err = dc_gain - ss_val
 #+end_src
 
 #+RESULTS:
@@ -408,7 +402,7 @@ ss_err =
   -693.8894e-018
 #+end_src
 
-[fn:floatingpoint] The calculated error is not exactly zero probably due to limits of precision with floating point calculations.
+[fn:floatingpoint] The calculated error is not exactly zero probably due to limits of precision with floating point calculations and fractional order system approximations.
 The real system as configured likely has zero steady state error.
 
 
@@ -437,7 +431,12 @@ fc =
 * Q4
 Based on your selected $Z_3$, $Z_4$, and $Z_5$, draw the Bode plot and step response of $V_{Io}/V_{Ir}$.
 
+*Note:* The Bode plots must be appropriately labeled with DC gain, relevant break frequencies, and slopes.
+The Bode plots must include the phase plot as well as magnitude.
+The step responses should have the correct initial slope (based on system order), labeled time constant, \SI{10}{\percent}-\SI{90}{\percent} rise time, steady-state value, and percentage overshoot (if any).
+
 ** Answer
+*** Bode Plot
 First computing the bandwidth of the PA13 loop:
 #+begin_src matlab :session :results output code :exports both
 [mag, ~] = bode(G_PA_cl, freq);
@@ -457,45 +456,94 @@ bw_PA_hz =
     10.5619e+003
 #+end_src
 
-Plotting the bode plot:
-#+begin_src matlab :session :results file :exports results
-f_name = 'G_cl_bode.svg'
-fig = figure('visible', 'off',...
-            'Position', [0 0 600 400]);
+It appears that because our transfer function is of a fractional order, the $\SI{-3}{\decibel}$ points don't quite line up with the corner frequencies.
+We can instead find the true corner frequencies of the entire system by finding local minima in the second derivative of the gain plot.
+We can also use the derivative to find the slope between each corner frequency.
+Calculating the FRF and finding the corner frequencies:
+#+begin_src matlab :session :results output code :exports both
 [mag, phase] = bode(G_cl, freq);
 mag = 20*log10(squeeze(mag));
 phase = squeeze(phase);
-mag_wc2 = interp1(freq, mag, bw_PA);
+dmag = gradient(mag);
+ddmag = gradient(dmag);
+[~, idxs] = findpeaks(-ddmag, 'MinPeakProminence', 1e-7);
+wc1 = freq(idxs(1))  % rad/s
+wc2 = freq(idxs(2))  % rad/s
+mag_wc1 = mag(idxs(1))  % dB
+mag_wc2 = mag(idxs(2))  % dB
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+wc1 =
+    57.5000e+003
+wc2 =
+     1.7782e+006
+mag_wc1 =
+   -16.3362e+000
+mag_wc2 =
+   -43.9586e+000
+#+end_src
+
+Finding the slopes between corner frequencies
+#+begin_src matlab :session :results output code :exports both
+slp_idxs = round([mean(idxs(1:2)), mean([idxs(2), length(freq)])]);
+dmagdfreq = dmag'./gradient(log10(freq));
+slps = dmagdfreq(slp_idxs)
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+slps =
+   -18.4414e+000   -45.2202e+000
+#+end_src
+
+Plotting the gain plot:
+#+begin_src matlab :session :results raw drawer :exports code
+fig = figure('visible', 'off',...
+            'Position', [0 0 600 600]);
+mag_bw_PA = interp1(freq, mag, bw_PA);
 ax1 = subplot(2, 1, 1);
 semilogx(freq, mag);
 hold on;
 plot([min(freq), bw], [dc_gain_db - 3, dc_gain_db - 3], 'k--');
-plot([bw, bw], [min(mag), dc_gain_db - 3], 'r');
-plot([bw_PA, bw_PA], [min(mag), mag_wc2], 'g');
+plot([bw, bw], [min(mag), dc_gain_db - 3], 'r--');
+plot([bw_PA, bw_PA], [min(mag), mag_bw_PA], 'g--');
+plot([wc1, wc1], [min(mag), mag_wc1], 'r');
+plot([wc2, wc2], [min(mag), mag_wc2], 'g');
 hold off;
+text(freq(slp_idxs(1)), mag(slp_idxs(1)), sprintf('%.2f dB/dec', slps(1)));
+text(freq(slp_idxs(2)), mag(slp_idxs(2)), sprintf('%.2f dB/dec', slps(2)));
 ylim([min(mag) ceil(max(mag)/10)*10+10]);
 l1 = legend(...
     '$L(s)$', ...
     '-3dB line', ...
-    sprintf('$\\omega_{c1}$ = %.2e', bw),...
-    sprintf('$\\omega_{c2}$ = %.2e', bw_PA));
+    sprintf('BW = %.2e', bw),...
+    sprintf('BW (PA13) = %.2e', bw_PA),...
+    sprintf('$\\omega_{c1}$ = %.2e', wc1),...
+    sprintf('$\\omega_{c2}$ = %.2e', wc2));
 set(l1, 'Interpreter', 'none',...
         'color', 'none', 'edgecolor', 'none',...
         'Location', 'west');
 % Put tick for DC gain
 mag_ticks = [-120:20:0];
 mag_ticks(mag_ticks==-20) = [];
-mag_ticks(end + 1) = dc_gain_db
+mag_ticks(end + 1) = dc_gain_db;
 mag_ticks = sort(mag_ticks);
 yticks(mag_ticks);
-title('Bode Plot')
 ylabel('Magnitude [dB]');
+#+end_src
+
+#+RESULTS:
+:results:
+org_babel_eoe
+:end:
+
+Plotting the phase plot:
+#+begin_src matlab :session :results raw drawer :exports code
 ax2 = subplot(2, 1, 2);
-semilogx(freq, phase);
-hold on;
-plot([min(freq), max(freq)], [-180, -180], 'k--');
-plot([wc, wc], [-180, -180 + pm], 'r');
-hold off;
+% Subtract 180 because gain is negative
+semilogx(freq, phase - 180);
 l2 = legend(...
     '$L(s)$', '$-180^\circ$ line', '$\phi_m$');
 set(l2, 'Interpreter', 'none',...
@@ -505,21 +553,113 @@ ylabel('Phase [deg]');
 xlabel('Frequency [rad/s]');
 linkaxes([ax1, ax2], 'x');
 xlim([min(freq), max(freq)]);
+#+end_src
 
+#+RESULTS:
+:results:
+org_babel_eoe
+:end:
+
+Printing the graph:
+#+begin_src matlab :session :results file :exports both
+f_name = 'G_cl_bode.svg'
 saveas(fig, f_name);
 ans = f_name;
 #+end_src
 
 #+RESULTS:
 [[file:G_cl_bode.svg]]
+
+*** Step Response
+
+Calculating the step response:
+#+begin_src matlab :session :results output code :exports both
+% Setting the time scale to be too fine/too long seems to cause the
+% simulation to diverge, this value has been picked to minimize this
+% divergence while maximizing temporal resolution
+time = linspace(0, 0.01, 2500);
+y = step(G_cl, time);
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+#+end_src
+
+The initial slope[fn:slope] is:
+#+begin_src matlab :session :results output code :exports both
+dydt = gradient(y')./gradient(time);
+initial_slope = dydt(1)  % V/s
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+initial_slope =
+    -9.3407e+003
+#+end_src
+
+The time constant, rise time, and overshoot are:
+#+begin_src matlab :session :results output code :exports both
+% FOMCON doesn't implement stepinfo, we have to do it manually
+tc_val = ss_val*(1 - exp(-1))
+tau = interp1(y(1:100), time(1:100), tc_val)
+rt_val1 = ss_val*0.1;
+rt_val2 = ss_val*0.9;
+rt1 = interp1(y(1:100), time(1:100), rt_val1);
+rt2 = interp1(y(1:100), time(1:100), rt_val2);
+rt = rt2 - rt1
+[y_max, max_idx] = max(abs(y));
+t_max = time(max_idx);
+overshoot = y_max - abs(ss_val);
+pct_overshoot = overshoot/abs(ss_val) * 100
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+tc_val =
+  -126.4241e-003
+tau =
+    17.4721e-006
+rt =
+    34.4412e-006
+pct_overshoot =
+     3.2005e+000
+#+end_src
+
+Plotting the step response[fn:abs] to show rise time and time constant:
 #+begin_src matlab :session :results file :exports both
 f_name = 'G_cl_step.svg'
 fig = figure('visible', 'off',...
             'Position', [0 0 600 300]);
-step(G_cl, linspace(0,0.001, 1000))
-xlim([0, 0.0002]);
-ylim([-0.25, 0]);
-
+plot(time, -y)
+hold on;
+plot([tau, tau], [0, -tc_val]);
+plot([0, tau], [-tc_val, -tc_val]);
+plot([rt1, rt1], [0, 0.25], '--', 'color', 0.5*[1 1 1]);
+plot([rt2, rt2], [0, 0.25], '--', 'color', 0.5*[1 1 1]);
+plot([rt1, rt1], [0, -rt_val1]);
+plot([rt2, rt2], [0, -rt_val2]);
+plot([rt1, rt2], [0.2, 0.2]);
+hold off;
+% Setting xlim seems to force MATLAB to export plots
+% with text prerendered, we will have to use the built
+% in LaTeX interpreter
+xlim([0, 0.00005]);
+ylim([0, 0.25]);
+text(tau, -tc_val/2,...
+     sprintf('%.2f V = 0.63*(0.2 V)', -tc_val));
+text(tau/2, -tc_val+0.01,...
+     sprintf('\\tau = %.2e s', tau),...
+     'HorizontalAlignment', 'center');
+text(rt1, -rt_val1/2,...
+     sprintf('%.2f V = 0.1*(0.2 V)', -rt_val1));
+text(rt2, -rt_val2/2,...
+     sprintf('%.2f V = 0.9*(0.2 V)', -rt_val2));
+text(mean([rt1, rt2]), 0.21,...
+     sprintf('Rise Time = %.2e s', rt),...
+     'HorizontalAlignment', 'center');
+title('Step Response');
+xlabel('Time [s]');
+ylabel('Absolute output [V]');
 saveas(fig, f_name);
 ans = f_name;
 #+end_src
@@ -527,25 +667,70 @@ ans = f_name;
 #+RESULTS:
 [[file:G_cl_step.svg]]
 
-
-The exact values of $\omega_c$ and $\phi_m$ are:
-#+begin_src matlab :session :results output code :exports both
-wc  % rad/s
-fc = wc/(2*pi)  % Hz
-pm  % deg
+Plotting the step response to show overshoot:
+#+begin_src matlab :session :results file :exports both
+f_name = 'G_cl_step_overshoot.svg'
+fig = figure('visible', 'off',...
+            'Position', [0 0 600 300]);
+plot(time, -y)
+hold on;
+plot([0, max(time)], [0.2, 0.2], '--', 'color', 0.5*[1 1 1]);
+plot([t_max, t_max], [0.2, y_max]);
+hold off;
+% Setting xlim seems to force MATLAB to export plots
+% with text prerendered, we will have to use the built
+% in LaTeX interpreter
+xlim([0, 0.001]);
+ylim([0.19, 0.21]);
+text(t_max, mean([y_max, 0.2]),...
+     sprintf('Overshoot = %.2f %%', pct_overshoot));
+title('Step Response');
+xlabel('Time [s]');
+ylabel('Absolute output [V]');
+saveas(fig, f_name);
+ans = f_name;
 #+end_src
 
 #+RESULTS:
-#+begin_src matlab
-wc =
-    62.2009e+003
-fc =
-     9.8996e+003
-pm =
-    86.0295e+000
+[[file:G_cl_step_overshoot.svg]]
+
+Plotting the step response to show initial slope:
+#+begin_src matlab :session :results file :exports both
+f_name = 'G_cl_step_slope.svg'
+fig = figure('visible', 'off',...
+            'Position', [0 0 600 300]);
+plot(time, -y)
+hold on;
+plot([0, 1], [0, -initial_slope], '--')
+hold off;
+% Setting xlim seems to force MATLAB to export plots
+% with text prerendered, we will have to use the built
+% in LaTeX interpreter
+xlim([0, 0.00005]);
+ylim([0, 0.25]);
+text(0.000022, -0.000022*initial_slope,...
+     sprintf('Initial slope = %.2e V/s', -initial_slope),...
+     'HorizontalAlignment', 'right');
+title('Step Response');
+xlabel('Time [s]');
+ylabel('Absolute output [V]');
+saveas(fig, f_name);
+ans = f_name;
 #+end_src
 
+#+RESULTS:
+[[file:G_cl_step_slope.svg]]
 
+[fn:slope] The lab manual mentions that the step response should have "the correct initial slope (based on the system order)".
+I'm not quite sure what this means.
+For anything other than a first order system, the initial slope is determined by more than just the system order.
+Because of this, I will simply be finding the slope and other characteristics of the step response from the simulation data.
+
+
+
+
+
+[fn:abs] I will be plotting the absolute value of the output so that the graphs are easier to follow.
 
 
 
