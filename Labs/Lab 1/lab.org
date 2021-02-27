@@ -1,0 +1,708 @@
+#+TITLE: MECH 421 Lab 1
+#+AUTHOR: Jasper Chan - 37467164
+
+#+OPTIONS: toc:nil
+
+#+LATEX_HEADER: \definecolor{bg}{rgb}{0.95,0.95,0.95}
+#+LATEX_HEADER: \setminted{frame=single,bgcolor=bg,samepage=true}
+#+LATEX_HEADER: \setlength{\parindent}{0pt}
+#+LATEX_HEADER: \usepackage{float}
+#+LATEX_HEADER: \usepackage{svg}
+#+LATEX_HEADER: \usepackage{cancel}
+#+LATEX_HEADER: \usepackage{amssymb}
+#+LATEX_HEADER: \usepackage{mathtools, nccmath}
+#+LATEX_HEADER: \sisetup{per-mode=fraction}
+#+LATEX_HEADER: \newcommand{\Lwrap}[1]{\left\{#1\right\}}
+#+LATEX_HEADER: \newcommand{\Lagr}[1]{\mathcal{L}\Lwrap{#1}}
+#+LATEX_HEADER: \newcommand{\Lagri}[1]{\mathcal{L}^{-1}\Lwrap{#1}}
+#+LATEX_HEADER: \newcommand{\Ztrans}[1]{\mathcal{Z}\Lwrap{#1}}
+#+LATEX_HEADER: \newcommand{\Ztransi}[1]{\mathcal{Z}^{-1}\Lwrap{#1}}
+#+LATEX_HEADER: \newcommand{\ZOH}[1]{\text{ZOH}\left(#1\right)}
+#+LATEX_HEADER: \DeclarePairedDelimiter{\ceil}{\lceil}{\rceil}
+#+LATEX_HEADER: \makeatletter \AtBeginEnvironment{minted}{\dontdofcolorbox} \def\dontdofcolorbox{\renewcommand\fcolorbox[4][]{##4}} \makeatother
+
+#+LATEX_HEADER: \renewcommand\arraystretch{1.2}
+
+#+begin_src ipython :session :results raw drawer :exports none
+import numpy as np
+import pandas as pd
+import os
+from matplotlib import pyplot as plt
+from sympy import Symbol
+from PySpice.Spice.Netlist import Circuit, SubCircuitFactory
+from PySpice.Spice.Library import SpiceLibrary
+from PySpice.Plot.BodeDiagram import bode_diagram
+from IPython.display import set_matplotlib_formats
+from scipy import signal, optimize
+import shutil
+import tempfile
+%matplotlib inline
+set_matplotlib_formats('svg')
+#+end_src
+
+#+RESULTS:
+:results:
+# Out[1]:
+:end:
+
+#+begin_src ipython :session :results raw drawer :exports none
+import IPython
+from tabulate import tabulate
+
+class OrgFormatter(IPython.core.formatters.BaseFormatter):
+    def __call__(self, obj):
+        if(isinstance(obj, list)):
+            return None
+        if(isinstance(obj, str)):
+            return None
+        if(isinstance(obj, pd.core.indexes.base.Index)):
+            return None
+        try:
+            return tabulate(obj, headers='keys',
+                            tablefmt='orgtbl', showindex=False)
+        except:
+            return None
+
+ip = get_ipython()
+ip.display_formatter.formatters['text/org'] = OrgFormatter()
+#+end_src
+
+#+RESULTS:
+:results:
+# Out[3]:
+:end:
+
+#+NAME: fig:lab_circuit
+#+ATTR_LATEX: :width 0.6\textwidth
+#+CAPTION: Circuit diagram of lab setup.
+[[file:lab_circuit.svg]]
+
+* Voltage stage without motor load
+Loading our amplifier implementation from the prelab:
+#+begin_src ipython :session :results output code :exports both
+class PA13Amplifier(SubCircuitFactory):
+    __name__ = 'pa13_amplifier'
+    __nodes__ = ('in+', 'out')
+    def __init__(self, Z_1, Z_2, R_lim=0.2):
+        super().__init__()
+
+        # Supply rails
+        self.V('s+', 'vs+', self.gnd, 25)
+        self.V('s-', self.gnd, 'vs-', 25)
+
+        # PA13
+        self.X('1', 'PA13',
+                'in+', 'in-', 'out',  # Inputs/outputs
+                'vs+', 'vs-',  # Supply rails
+                'cl+', 'cl-',  #  Current limit
+                self.gnd)  # foldover
+
+        # Current limiting resistors
+        self.R('lim+', 'cl+', 'out', R_lim)
+        self.R('lim-', 'cl-', 'out', R_lim)
+
+        # Gain setting resistors
+        self.R('z1', self.gnd, 'in-', Z_1)
+        self.R('z2', 'in-', 'out', Z_2)
+#+end_src
+
+#+RESULTS:
+#+begin_src ipython
+#+end_src
+
+** Step response
+*** Simulation
+Constructing a circuit with a square wave input:
+#+begin_src ipython :session :results output code :exports both
+# Values from provided schematic
+Z_1 = 2.2*10**3  # ohm
+Z_2 = 22*10**3  # ohm
+def step_resp(vpk_pk):
+    vmax = vpk_pk/2
+    shutil.copyfile('PA13.LIB', '/tmp/PA13.LIB')
+    circuit = Circuit('Step Response')
+    circuit.include('/tmp/PA13.LIB')
+    circuit.subcircuit(PA13Amplifier(Z_1, Z_2))
+    circuit.X('1', 'pa13_amplifier', 'vr', 'vo')
+    circuit.PulseVoltageSource(
+        'input', 'vr', circuit.gnd,
+        -vmax, vmax,
+        pulse_width=0.05,  # 0.05s
+        period=0.1,  # 0.1s, 10Hz
+        rise_time=1e-9, fall_time=1e-9)  # From lab provided schematic
+
+    simulator = circuit.simulator()
+    # Force ngspice to have shorter time steps near sharp transitions
+    simulator.options(trtol=0.0001)  
+    analysis = simulator.transient(
+        step_time=0.1,  # Lab schematic suggests 0.1s, this seems too slow
+        end_time=0.045)  # Lab schematic stops at 1s, we only need the first step
+    return analysis
+#+end_src
+
+#+RESULTS:
+#+begin_src ipython
+#+end_src
+
+Let's run the simulation for the specified voltages:
+#+begin_src ipython :session :eval never-export :results raw drawer :exports both
+V_r = [0.2, 0.5, 2.0, 5.0]  # V
+resp = [step_resp(v) for v in V_r]
+#+end_src
+
+#+RESULTS:
+:results:
+# Out[5]:
+:end:
+
+*** Step Response Information
+Calculating the rise time and overshoot:
+#+begin_src ipython :session :eval never-export :results output code :exports both
+def norm_step(t, v, t_f=0.4):
+    v_s = v[0]
+    v_ofst = v - v_s
+    v_f = np.interp(t_f, t, v_ofst)
+    v_norm = v_ofst/v_f
+    return v_norm, v_f
+    
+def step_info(resp):
+    t_f = 0.04  # s, time to reach steady state
+    # Extract data and remove units
+    t = np.array(resp.time.tolist())
+    vr = np.array(resp.nodes['vr'].tolist())
+    vo = np.array(resp.nodes['vo'].tolist())
+
+    vr_norm, vr_f = norm_step(t, vr)
+    vo_norm, vo_f = norm_step(t, vo)
+
+    # Actual gain
+    gain = np.abs(vo_f/vr_f)
+
+    # Overshoot
+    pct_overshoot = (max(vo_norm) - 1)*100
+
+    # Rise time
+    t_rt1 = np.interp(0.1, vo_norm, t)
+    t_rt2 = np.interp(0.9, vo_norm, t)
+    t_rt = t_rt2 - t_rt1
+
+    return t, vo_norm, vr_f, pct_overshoot, t_rt, gain
+
+for r in resp:
+    _, _, vr_f, ovsht, t_rt, gain = step_info(r)
+    print(
+        f"V_r = {vr_f} V_pkpk, "
+        f"Overshoot: {ovsht:.3e}%, Rise Time: {t_rt:.3e} s, "
+        f"DC gain: {gain:.3f}")
+#+end_src
+
+#+RESULTS:
+#+begin_src ipython
+V_r = 0.2 V_pkpk, Overshoot: 3.818e-03%, Rise Time: 7.793e-07 s, DC gain: 10.999
+V_r = 0.5 V_pkpk, Overshoot: 1.676e-03%, Rise Time: 1.218e-06 s, DC gain: 10.999
+V_r = 2.0 V_pkpk, Overshoot: 4.245e-04%, Rise Time: 4.301e-06 s, DC gain: 10.999
+V_r = 5.0 V_pkpk, Overshoot: 1.030e-08%, Rise Time: 8.762e-06 s, DC gain: 8.981
+#+end_src
+
+We can see that for a $\SI{5}{\volt}$ input, we exceed the limits of the power rails, and as expected the output is clipped, hence why the DC gain is reduced.
+*** Step Response Plots
+
+Plotting the normalized step response for each input voltage[fn:neglect]:
+#+begin_src ipython :session :eval never-export :results raw drawer :ipyfile noload_step.svg :exports both
+fig, axes = plt.subplots(4, 1, figsize=[6.4, 10])
+for idx, r in enumerate(resp):
+    t, vo_norm, vr_f, _, t_rt, _ = step_info(r)
+    ax = axes[idx]
+    ax.plot(t, vo_norm)
+    ax.set_xlim([0, t_rt*3])
+    ax.grid()
+    ax.set_ylabel(f'Normalized output\nV_r = {vr_f} V_pkpk')
+ax.set_xlabel('Time [s]')
+fig.suptitle('Step Response of PA13 Circuit')
+fig.tight_layout()
+
+#+end_src
+
+#+RESULTS:
+:results:
+# Out[7]:
+[[file:noload_step.svg]]
+:end:
+
+[fn:neglect] The lab manual does not request that rise time and overshoot be indicated in the plots, and since I have already calculated them, doing so is left as an exercise to the reader.
+
+** Frequency Response
+*** Simulation
+Constructing a circuit with a sinusoidal input:
+#+begin_src ipython :session :results output code :exports both
+def freq_resp():
+    shutil.copyfile('PA13.LIB', '/tmp/PA13.LIB')
+    circuit = Circuit('Freq Response')
+    circuit.include('/tmp/PA13.LIB')
+    circuit.subcircuit(PA13Amplifier(Z_1, Z_2))
+    circuit.X('1', 'pa13_amplifier', 'vr', 'vo')
+    circuit.SinusoidalVoltageSource(
+        'input', 'vr', circuit.gnd, amplitude=0.1)
+
+    simulator = circuit.simulator()
+    # Force ngspice to have shorter time steps near sharp transitions
+    simulator.options(trtol=0.0001)  
+    analysis = simulator.ac(
+        start_frequency=50e0,
+        stop_frequency=10e6,
+        number_of_points=1000,  # Lab manual suggests 20, might as well do more
+        variation='dec')
+    return analysis
+#+end_src
+
+#+RESULTS:
+#+begin_src ipython
+#+end_src
+
+Running the simulation:
+#+begin_src ipython :session :eval never-export :results raw drawer :exports both
+resp = freq_resp()
+#+end_src
+
+#+RESULTS:
+:results:
+# Out[9]:
+:end:
+
+*** Bandwidth
+Finding the $\SI{-3}{\decibel}$ bandwidth:
+#+begin_src ipython :session :eval never-export :results raw drawer :exports both
+freq = np.array(resp.frequency.tolist())
+vo = np.array(resp.vo.tolist())
+gain = 20*np.log10(np.absolute(vo))
+phase = np.angle(vo, deg=True)
+
+bw = np.interp(-(gain[0] - 3), -gain, freq)
+f"{bw:.2f} Hz"
+#+end_src
+
+#+RESULTS:
+:results:
+# Out[10]:
+: '479377.93 Hz'
+:end:
+
+We can see that the bandwidth almost exactly matches the prelab (PySpice generated) value of $\SI{478630}{\hertz}$, with the slight difference probably due to the different resistor values chosen.
+The bandwidth here is also somewhat similar to the (FOMCON generated) value of $\SI{383850}{\hertz}$, and as stated in the prelab it seems that the model provided by Apex Analog slightly differs from what is stated in the datasheet.
+
+*** Bode Plot
+Plotting the bode plot:
+#+begin_src ipython :session :eval never-export :results raw drawer :exports both
+def bode_plot(f, g, p):
+    figure, ax = plt.subplots(2, figsize=(5, 5), sharex=True)
+    _items = [g, p]
+    _labels = ['Gain [dB]', 'Phase [deg]']
+    for i in range(2):
+        ax[i].semilogx(f, _items[i], base=10)
+        ax[i].grid(True)
+        ax[i].grid(True, which='minor')
+        ax[i].set_ylabel(_labels[i])
+    ax[1].set_xlabel('Frequency [Hz]')
+    return figure, ax
+
+fig, ax = bode_plot(freq, gain, phase)
+ax[0].vlines(bw, min(gain), max(gain), color='r')
+ax[1].vlines(bw, min(phase), max(phase), color='r')
+_ = ax[0].legend(['Response', 'Bandwidth'])
+#+end_src
+
+#+RESULTS:
+:results:
+# Out[11]:
+[[file:./obipy-resources/1LNvbg.svg]]
+:end:
+
+* Voltage stage with motor load
+** Step response
+*** Simulation
+Constructing a circuit[fn:canyoutryalittleharder] with a square wave input:
+#+begin_src ipython :session :results output code :exports both
+# Values from provided schematic
+R_m = 3
+L_m = 1.07e-3
+R_s = 0.2
+def step_resp_mot():
+    vpk_pk = 0.2
+    vmax = vpk_pk/2
+    shutil.copyfile('PA13.LIB', '/tmp/PA13.LIB')
+    circuit = Circuit('Step Response with Motor')
+    circuit.include('/tmp/PA13.LIB')
+    circuit.subcircuit(PA13Amplifier(Z_1, Z_2))
+    circuit.X('1', 'pa13_amplifier', 'vr', 'vo')
+    circuit.R('m', 'vo', 'vm1', R_m)
+    circuit.L('m', 'vm1', 'vio', L_m)
+    # Assuming the feedback current is negligible so we can just
+    # simulate the shunt resistor without the feedback components
+    circuit.R('s', 'vio', circuit.gnd, R_s)
+    
+    circuit.PulseVoltageSource(
+        'input', 'vr', circuit.gnd,
+        -vmax, vmax,
+        pulse_width=0.05,  # 0.05s
+        period=0.1,  # 0.1s, 10Hz
+        rise_time=1e-9, fall_time=1e-9)  # From lab provided schematic
+
+    simulator = circuit.simulator()
+    # Force ngspice to have shorter time steps near sharp transitions
+    simulator.options(trtol=0.0001)  
+    analysis = simulator.transient(
+        step_time=0.1,  # Lab schematic suggests 0.1s, this seems too slow
+        end_time=0.045)  # Lab schematic stops at 1s, we only need the first step
+    return analysis
+#+end_src
+
+#+RESULTS:
+#+begin_src ipython
+#+end_src
+
+Running the simulation:
+#+begin_src ipython :session :eval never-export :results raw drawer :exports both
+resp = step_resp_mot()
+#+end_src
+
+#+RESULTS:
+:results:
+# Out[13]:
+:end:
+
+[fn:canyoutryalittleharder]
+Seems odd to ask for simulation data for only one question related to the motor.
+Considering that "For 4.2.1. please use the frequency response feature in LTSpice" makes no sense since 4.2.1 asks for a step response, I am going to assume you meant 4.1.2 or 4.2.2, which actually asks for a frequency response.
+If further corrections are necessary in the future, please make sure they are actually correct.
+*** Time Constant
+Calculating the time constant:
+#+begin_src ipython :session :eval never-export :results raw drawer :exports both
+t = np.array(resp.time.tolist())
+vio = np.array(resp.nodes['vio'].tolist())
+vio_norm, _ = norm_step(t, vio)
+
+tau = np.interp(1 - np.exp(-1), vio_norm, t)
+tau
+#+end_src
+
+#+RESULTS:
+:results:
+# Out[14]:
+: 0.0003349475068136391
+:end:
+
+I actually forgot to calculate the time constant for $I_o(s)/V_o(s)$ during the prelab to compare, so let's do that now.
+Loading the prelab values into MATLAB:
+#+begin_src matlab :session :results output code :exports both
+s = tf('s');  % No need for FOMCON here
+% From Prelab 1
+R_m = 3;  % ohm
+L_m = 1e-3;  % H
+L_m_sch = 1.07e-3;  % H, from schematic
+R_s = 0.2; % ohm
+
+I_V = 1/(R_s + R_m + L_m*s)
+I_V_sch = 1/(R_s + R_m + L_m_sch*s)
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+I_V =
+ 
+        1
+  -------------
+  0.001 s + 3.2
+ 
+Continuous-time transfer function.
+I_V_sch =
+ 
+         1
+  ---------------
+  0.00107 s + 3.2
+ 
+Continuous-time transfer function.
+#+end_src
+
+The time constant is then:
+#+begin_src matlab :session :results output code :exports both
+si = stepinfo(I_V);
+si_sch = stepinfo(I_V_sch);
+rt = si.RiseTime
+rt_sch = si_sch.RiseTime
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+rt =
+   6.8656e-04
+rt_sch =
+   7.3462e-04
+#+end_src
+
+We can see that we are in the same order of magnutude, but off by about a factor of 2.
+I'm not really sure why that is.
+Intuitively, the time constant of $I_o(s)/V_r(s)$ should be roughly the same as $I_o(s)/V_r(s)$, since the voltage stage should be many magnitudes faster (higher bandwidth) than the motor stage, and certainly not lower.
+My only guess is that the PA13 configuration pins may somehow cause it to behave differently than we would expect here.
+
+** Frequency Response
+We have been asked to use provided data to plot the Bode plots for this portion[fn:bodeffs].
+
+Assuming this data has been collected by driving $V_r$, we have been given the following sets of data:
+- ~Lab1_4.2.2_Vo.csv~: Presumably this contains the Bode plot for $V_o(s)/V_r(s)$
+- ~Lab1_4.2.2_Vi.csv~: Presumably this contains the Bode plot for $V_{Io}(s)/V_r(s)$[fn:nameyourshitproperly]
+
+Loading this data:
+#+begin_src ipython :session :results raw drawer :exports both
+# Please don't put unicode characters in csv files
+def sanitize_open(f_name, *args, **kwargs):
+    with open(f_name, 'rb') as f:
+        with tempfile.TemporaryFile('w+') as tf:
+            tf.write(f.read().decode("utf-8", errors="ignore"))
+            tf.seek(0)
+            return pd.read_csv(tf, *args, **kwargs)
+df_vo = sanitize_open('Lab1_4.2.2_Vo.csv')
+df_vio = sanitize_open('Lab1_4.2.2_Vi.csv')
+#+end_src
+
+#+RESULTS:
+:results:
+# Out[66]:
+:end:
+[fn:bodeffs]
+Seems like an odd decision, the way this section is done has nothing to do with where the data comes from, aside from already knowing $R_m$ and $L_m$ for the final calculation if using simulation data.
+
+[fn:nameyourshitproperly]
+Please make sure to properly name any data files you provide and/or actually explain what data is contained within.
+
+*** Bode Plot of $V_o(s)/V_r(s)$
+#+begin_src ipython :session :results raw drawer :exports both
+freq = np.array(df_vo[' Frequency (Hz)'])
+gain_vo = np.array(df_vo[' Gain (dB)'])
+phase_vo = np.array(df_vo[' Phase ()'])
+
+_ = bode_plot(freq, gain_vo, phase_vo)
+#+end_src
+
+#+RESULTS:
+:results:
+# Out[5]:
+[[file:./obipy-resources/RlWGUn.svg]]
+:end:
+
+
+*** Bode Plot of $I_o(s)/V_o(s)$
+We can express $V_{Io}(s)/V_r(s)$ as:
+\begin{equation*}
+\frac{V_{Io}(s)}{V_r(s)}
+=
+\frac{V_o(s)}{V_r(s)}
+\underbrace{
+\frac{V_{Io}(s)}{V_o(s)}
+}_{G_\text{mot}(s)}
+\end{equation*}
+$G_\text{mot}(s)$ is then:
+\begin{equation*}
+\frac{V_{Io}(s)}{V_o(s)}
+=
+\frac{V_{Io}(s)}{V_r(s)}
+\frac{V_r(s)}{V_o(s)}
+\end{equation*}
+
+We can then get $I_o(s)/V_o(s)$ by making the substitution $I_o = V_Io/R_s$
+
+When transfer functions are multiplied together, they are added together (in \si{\decibel}).
+In this case, we want to subtract them since they are divided.
+#+begin_src ipython :session :results raw drawer :exports both
+gain_vio = np.array(df_vio[' Gain (dB)'])
+phase_vio = np.array(df_vio[' Phase ()'])
+
+gain_vio_o = gain_vio - gain_vo
+phase_vio_o = phase_vio - phase_vo
+
+# Convert back to absolute to do division, then back into dB
+gain_io = 20*np.log10((10**(gain_vio_o/20))/R_s)
+
+_ = bode_plot(freq, gain_io, phase_vio_o)
+#+end_src
+
+#+RESULTS:
+:results:
+# Out[6]:
+[[file:./obipy-resources/XjJZZC.svg]]
+:end:
+
+*** Bode Plot of $V_{Io}(s)/V_r(s)$
+#+begin_src ipython :session :results raw drawer :exports both
+_ = bode_plot(freq, gain_vio, phase_vio)
+#+end_src
+
+#+RESULTS:
+:results:
+# Out[8]:
+[[file:./obipy-resources/PYKayR.svg]]
+:end:
+
+*** Motor Resistance and Inductance Values
+The motor resistance is given by:
+\begin{align*}
+\frac{I_o(s)}{V_o(s)}
+&=
+\frac{1}{Z_\text{mot}(s)} \\
+&=
+\frac{1}{L_m s + R_s + R_m} \\
+&=
+\frac{1}{L_m}
+\cdot
+\frac{1}{s + \frac{R_s + R_m}{L_m}}
+\end{align*}
+
+We can find $R_m$ by looking at the low frequency gain, where it should approach:
+\begin{align*}
+\lim_{\omega \to 0}
+\frac{I_o(j\omega)}{V_o(j\omega)}
+&=
+\frac{1}{R_s + R_m}
+\end{align*}
+
+We can then find $L_m$ by finding the corner frequency which will be at:
+\begin{equation*}
+\frac{R_s + R_m}{L_m}
+\end{equation*}
+
+Ideally we would be able to do this by directly analyzing the graph data, however it appears there were some nonlinearities during measurement, so instead I will attempt to do a least squares curve fit.
+
+#+begin_src ipython :session :results raw drawer :exports both
+def fit_func(rm, lm, f):
+    K = 1/lm
+    p = (R_s + rm)/lm
+    num = [K]
+    den = [1, p]
+    tf = signal.TransferFunction(num, den)
+    # Only fit against gain, seems to be less noisy
+    _, gain, _ = signal.bode(tf, f)
+    return gain
+
+def cost(x, f, g):
+    return np.sum(np.square(fit_func(*x, f) - g))
+
+# From eyeballing the graph
+initial_guess = np.array([70, 0.1])
+res = optimize.minimize(
+    cost, initial_guess, method='Nelder-Mead', args=(freq, gain_io))
+x = res.x
+plt.semilogx(freq, gain_io, label='Raw Data')
+plt.semilogx(freq, fit_func(*x, freq), label='Best Fit')
+plt.legend()
+plt.xlabel('Frequency [Hz]')
+plt.ylabel('Gain [dB]')
+f"R_m = {x[0]:.2f} ohm, L_m = {x[1]:.3f} H"
+#+end_src
+
+#+RESULTS:
+:results:
+# Out[63]:
+: 'R_m = 87.37 ohm, L_m = 0.101 H'
+[[file:./obipy-resources/t17PEH.svg]]
+:end:
+
+* Destabilize the voltage stage
+Again, for whatever reason we've been provided with data ~Lab1_4.2.3.csv~[fn:badfilename] for this section.
+Loading and plotting it[fn:negative]:
+#+begin_src ipython :session :results raw drawer :exports both
+# I have no idea what the first row is supposed to indicate
+df = sanitize_open('Lab1_4.2.3.csv', skiprows=1)
+t = df['second']
+v = df['Volt']
+plt.plot(t, v)
+plt.xlabel('Time [s]')
+_ = plt.ylabel('Output [V]')
+#+end_src
+
+#+RESULTS:
+:results:
+# Out[93]:
+[[file:./obipy-resources/3R6wJQ.svg]]
+:end:
+With the capacitor added to $Z_1$, the circuit now oscillates.
+
+The circuit without the capacitor is stable, and hence has a positive phase margin.
+Let's verify this.
+Constructing our original transfer function:
+#+begin_src matlab :session :results output code :exports both
+Z_1 = 2.2e3;
+Z_2 = 22e3;
+f = Z_1/(Z_1 + Z_2);
+% From prelab
+K = 5.5245e+08;
+a = 1.2301;
+b = 2531.8;
+s = fotf('s');
+A_gain = K/(s^a + b);
+L = f*A_gain
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+Fractional-order transfer function:
+   5.0223e+07
+-----------------
+s^{1.2301}+2531.8
+#+end_src
+
+Calculating the phase margin:
+#+begin_src matlab :session :results output code :exports both
+freq = logspace(1, 8, 100000);
+[mag, phase] = bode(L, freq);
+[gm, pm, wg, wc] = margin(mag, phase, freq);
+pm  % deg
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+pm =
+   69.2937
+#+end_src
+
+
+However, by adding a capacitor in parallel with $Z_1$, we put an extra pole in our feedback gain that pushes this phase margin to be negative.
+
+#+begin_src matlab :session :results output code :exports both
+R_1 = 2.2e3;
+C_1 = 470e-9;
+Z_1 = (R_1^-1 + C_1*s)^-1;
+f = Z_1/(Z_1 + Z_2);
+L = f*A_gain
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+Fractional-order transfer function:
+                                   259.65s+2.5111e+05
+----------------------------------------------------------------------------------------
+4.8598e-09s^{3.2301}+9.87e-06s^{2.2301}+1.2304e-05s^{2}+0.005s^{1.2301}+0.024989s+12.659
+#+end_src
+
+Calculating the phase margin:
+#+begin_src matlab :session :results output code :exports both
+[mag, phase] = bode(L, freq);
+[gm, pm, wg, wc] = margin(mag, phase, freq);
+pm  % deg
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+pm =
+  -19.6022
+#+end_src
+
+We can see that now our loop phase margin is negative, causing our system to be unstable.
+
+
+[fn:badfilename]
+Again, please make sure to give data files correct names in the future, this file should be related with section 4.3 of the lab manual.
+
+[fn:negative]
+The data seems to contain measurements taken at negative time, not really sure why that is.
+
+
+
