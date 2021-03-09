@@ -1,0 +1,470 @@
+#+TITLE: MECH 421 Assignment 4
+#+AUTHOR: Jasper Chan - 37467164
+
+#+OPTIONS: toc:nil
+
+#+LATEX_HEADER: \definecolor{bg}{rgb}{0.95,0.95,0.95}
+#+LATEX_HEADER: \setminted{frame=single,bgcolor=bg,samepage=true}
+#+LATEX_HEADER: \setlength{\parindent}{0pt}
+#+LATEX_HEADER: \usepackage{float}
+#+LATEX_HEADER: \usepackage{svg}
+#+LATEX_HEADER: \usepackage{cancel}
+#+LATEX_HEADER: \usepackage{amssymb}
+#+LATEX_HEADER: \usepackage{mathtools, nccmath}
+#+LATEX_HEADER: \sisetup{per-mode=fraction}
+#+LATEX_HEADER: \newcommand{\Lwrap}[1]{\left\{#1\right\}}
+#+LATEX_HEADER: \newcommand{\Lagr}[1]{\mathcal{L}\Lwrap{#1}}
+#+LATEX_HEADER: \newcommand{\Lagri}[1]{\mathcal{L}^{-1}\Lwrap{#1}}
+#+LATEX_HEADER: \newcommand{\Ztrans}[1]{\mathcal{Z}\Lwrap{#1}}
+#+LATEX_HEADER: \newcommand{\Ztransi}[1]{\mathcal{Z}^{-1}\Lwrap{#1}}
+#+LATEX_HEADER: \newcommand{\ZOH}[1]{\text{ZOH}\left(#1\right)}
+#+LATEX_HEADER: \DeclarePairedDelimiter{\ceil}{\lceil}{\rceil}
+#+LATEX_HEADER: \makeatletter \AtBeginEnvironment{minted}{\dontdofcolorbox} \def\dontdofcolorbox{\renewcommand\fcolorbox[4][]{##4}} \makeatother
+
+#+LATEX_HEADER: \renewcommand\arraystretch{1.2}
+
+#+begin_src ipython :session :results none :exports none
+import numpy as np
+import pandas as pd
+from matplotlib import pyplot as plt
+from sympy import Symbol
+from IPython.display import set_matplotlib_formats
+%matplotlib inline
+set_matplotlib_formats('svg')
+#+end_src
+#+begin_src ipython :session :results none :exports none
+import IPython
+from tabulate import tabulate
+
+class OrgFormatter(IPython.core.formatters.BaseFormatter):
+    def __call__(self, obj):
+        if(isinstance(obj, str)):
+            return None
+        if(isinstance(obj, pd.core.indexes.base.Index)):
+            return None
+        try:
+            return tabulate(obj, headers='keys',
+                            tablefmt='orgtbl', showindex=False)
+        except:
+            return None
+
+ip = get_ipython()
+ip.display_formatter.formatters['text/org'] = OrgFormatter()
+#+end_src
+* Problem 1
+Figure [[fig:fig1]] shows a transconductance amplifier driving a brushed dc motor.
+Here, $A_p(s)$ is the open-loop gain of a power op-amp,
+$A_s(s)$ is the open-loop gain of a signal op-amp,
+and $Z_3$, $Z_4$, and $Z_5$ are impedances to be designed.
+We assume infinite input impedance and zero output impedance for the op-amps.
+
+#+NAME: fig:fig1
+#+ATTR_LATEX: :placement [H]
+#+CAPTION: Schematic of a transonductance amplifier.
+[[file:fig1.svg]]
+** Q1
+<<sec:1a>>
+For the signal op-amp stage, draw a block diagram that shows the relation between $V_{Ir}$, $V_{Io}$, and $V_{r}$.
+The block diagram should show a feedback loop around $A_s(s)$.
+
+(Tip: do not use the virtual short approximation for $V_-$.
+Instead, use the superposition method to find the inverting terminal voltage $V_-$)
+*** Answer
+We can use KCL around $V_-$ directly instead of superposition to save a lot of algebra.
+First, expressing $V_-$ in terms of $A_s(s)$ and $V_r$:
+\begin{align*}
+A(\cancelto{0}{V_+} - V_-) &= V_r \\
+V_-
+&=
+-\frac{V_r}{A_s(s)}
+\end{align*}
+
+Now doing KCL around $V_-$
+\begin{align*}
+\frac{V_{Ir} - V_-}{Z_3} +
+\frac{V_{Io} - V_-}{Z_5} +
+\frac{V_{r} - V_-}{Z_4}
+&=
+0 \\
+V_-
+\underbrace{
+\left(
+\frac{1}{Z_3} + 
+\frac{1}{Z_4} + 
+\frac{1}{Z_5}
+\right)
+}_{Z_{345}}
+&=
+\frac{V_{Ir}}{Z_3} + 
+\frac{V_{Io}}{Z_5} + 
+\frac{V_{r}}{Z_4}
+\end{align*}
+
+Subbing in our expression for $V_-$:
+\begin{align*}
+-\frac{V_r}{A_s(s)}
+Z_{345}
+&=
+\frac{V_{Ir}}{Z_3} + 
+\frac{V_{Io}}{Z_5} + 
+\frac{V_{r}}{Z_4} \\
+V_r
+&=
+-\frac{A_s(s)}{Z_{345}}
+\left(
+V_{Ir}\frac{1}{Z_3} + 
+V_{Io}\frac{1}{Z_5} + 
+V_{r}\frac{1}{Z_4}
+\right) \\
+V_r
+&=
+\frac{A_s(s)}{Z_{345}}
+\left(
+V_{Ir}\frac{-1}{Z_3} + 
+V_{Io}\frac{-1}{Z_5} -
+V_{r}\frac{1}{Z_4}
+\right) \\
+V_r
+&=
+\frac{A_s(s)}{Z_4 Z_{345}}
+\left(
+V_{Ir}\frac{-Z_4}{Z_3} + 
+V_{Io}\frac{-Z_4}{Z_5} -
+V_{r}
+\right)
+\end{align*}
+The block diagram is then:
+#+begin_src matlab :session :exports none :results none :eval never-export
+simulink
+#+end_src
+#+begin_src matlab :session :exports both :results output code
+% Dummy values so that model will load properly
+Z_3 = 1;
+Z_4 = 1;
+Z_5 = 1;
+Z_345 = 1;
+A_s = 1;
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+#+end_src
+
+#+begin_src matlab :session :results none :exports code
+open_system('loop_A_s');
+print -dsvg -s 'loop_A_s.svg';
+#+end_src
+
+#+begin_src shell :exports results :results file
+inkscape loop_A_s.svg --export-text-to-path --export-plain-svg -o loop_A_s_fixed.svg
+printf 'loop_A_s_fixed.svg'
+#+end_src
+
+#+RESULTS:
+[[file:loop_A_s_fixed.svg]]
+** Q2
+Find the expression for the loop transfer function $L_s(s)$ of the signal op-amp stage in terms of $Z_3$, $Z_4$, $Z_5$, and $A_s(s)$.
+
+*** Answer
+As seen in the block diagram above, the loop transfer function $L_s(s)$ is:
+\begin{align*}
+L_s(s) &= -\text{L.T.} \\
+&=
+\frac{1}{Z_4 Z_{345}}A_s(s) \\
+&=
+\frac{1}
+{
+Z_4
+\left(
+\frac{1}{Z_3} + 
+\frac{1}{Z_4} + 
+\frac{1}{Z_5}
+\right)
+}
+A_s(s) \\
+&=
+\frac{1}{Z_4 Z_{345}}A_s(s) \\
+&=
+\frac{Z_3 Z_4 Z_5}{Z_3 Z_4 Z_5}
+\frac{1}
+{
+Z_4
+\left(
+\frac{1}{Z_3} + 
+\frac{1}{Z_4} + 
+\frac{1}{Z_5}
+\right)
+}
+A_s(s) \\
+&=
+\frac{Z_3 Z_4 Z_5}
+{
+Z_4
+\left(
+Z_4 Z_5 +
+Z_3 Z_5 + 
+Z_3 Z_4
+\right)
+}
+A_s(s) \\
+&=
+\frac{Z_3 Z_5}
+{
+Z_4 Z_5 +
+Z_3 Z_5 + 
+Z_3 Z_4
+}
+A_s(s) \\
+\end{align*}
+** Q3
+Carry out the block diagram algebra on the result of part [[sec:1a]] to complete the equivalent block diagrams in Figure [[fig:fig2]]
+
+#+NAME: fig:fig2
+#+ATTR_LATEX: :placement [H]
+#+CAPTION: Equivalent block diagram, where $T_s(s) = \frac{L_s(s)}{1 + L_s(s)}$
+[[file:fig2.svg]]
+
+* Problem 2
+Figure [[fig:fig3]] shows the full block diagram of the transconductance amplifier.
+Here, the motor back EMF $e$ is modeled as a disturbance signal, and the load impedance and feedback gain are approximated for $R_s \ll R_5$.
+The op-amp open-loop transfer functions and circuit parameters are given as follows:
+\begin{align*}
+A_s(s) &=
+\frac{5 \times 10^7}{s} &
+A_p(s) &=
+\frac{10^7}{s} &
+R_1 &=
+\SI{1}{\kilo\ohm} &
+R_2 &=
+\SI{9}{\kilo\ohm} \\
+L_m &=
+\SI{1}{\milli\henry} &
+R_m &=
+\SI{5.8}{\ohm} &
+R_s &=
+\SI{0.2}{\ohm} &
+R_5 &=
+\SI{1}{\kilo\ohm}
+\end{align*}
+
+We will select values for $R_3$, $R_4$, and $C_4$ to complete the amplifier design.
+Use MATLAB for the design process.
+
+#+NAME: fig:fig3
+#+ATTR_LATEX: :placement [H]
+#+CAPTION: Transconductance amplifier block diagram.
+[[file:fig3.svg]]
+** Selecting $R_3$
+Suppose we use a digital-to-analog converter (DAC) whose output range is $\pm\SI{10}{\volt}$.
+Also, suppose the motor is designed for dc current range of $\pm\SI{2}{\ampere}$.
+Find the value $R_3$ that allows maximum utilization of the DAC dynamic range.
+Assume that the loop transfer function has infinite dc gain.
+*** Answer
+Assuming the total loop transfer function goes to infinity at DC:
+\begin{align*}
+L(j\omega)
+&=
+(\text{Forward Path})\frac{R_s}{R_5} \\
+\cancelto{\infty}
+{L(j\omega)|_{\omega = 0}}
+&=
+(
+\cancelto{\infty}
+{\text{Forward Path}}
+)
+\underbrace{
+\frac{R_s}{R_5}
+}_{\text{constant}}
+\end{align*}
+The DC gain is then:
+\begin{align*}
+G(j\omega)|_{\omega = 0}
+&=
+-\frac{1}{R_3}
+\frac
+{
+\cancelto{\infty}
+{\text{Forward Path}}
+}
+{1 + 
+(
+\cancelto{\infty}
+{\text{Forward Path}}
+)
+\frac{R_s}{R_5}
+} \\
+&=
+-\frac{1}{R_3}
+\frac{R_5}{R_s} \\
+\left|
+G(j\omega)
+\right|_{\omega = 0}
+&=
+\frac{1}{R_3}
+\frac{R_5}{R_s}
+\end{align*}
+Solving for $R_3$:
+\begin{align*}
+R_3
+&=
+\frac{R_5}{
+R_s
+\left|
+G(j\omega)
+\right|_{\omega = 0}
+}
+\end{align*}
+
+In order to maximize the use of our DAC and motor, we want the DC gain to be $\SI{2}{\ampere}/\SI{10}{\volt} = \SI{0.2}{\ampere\per\volt}$.
+Plugging our numbers into MATLAB:
+#+begin_src matlab :session :exports both :results output code
+R_5 = 1e3;  % ohm
+R_s = 0.2;  % ohm
+dc_gain = 0.2;  % A/V (1/ohm)
+
+R_3 = R_5/(R_s*dc_gain)  % ohm
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+R_3 =
+   2.5000e+04
+#+end_src
+
+
+** Selecting $R_4$
+This step corresponds to the design of proportional control.
+For now, let us assume that the bandwidth of $T_s(s)$ is infinitely high (i.e., $T_s = 1$) and the capacitance $C_4$ is infinitely large.
+Find the value $R_4$ rounded to the nearest \si{\kilo\ohm} that makes the loop transfer function achieve the highest crossover frequency $\omega_c$ while guaranteeing phase margin $\phi_m \ge \SI{90}{\degree}$.
+Note that this step should account for the finite bandwidth of $T_p(s)$.
+Draw the Bode plot of the loop transfer function and find $\omega_c$ and $\phi_m$.
+*** Answer
+Let's start by inputting the rest of our given parameters:
+#+begin_src matlab :session :exports both :results output code
+s = tf('s');
+A_s = 5e7/s;
+A_p = 1e7/s;
+R_1 = 1e3;  % ohm
+R_2 = 9e3; % ohm
+L_m = 1e-3; % H
+R_m = 5.8; %ohm
+f = R_1/(R_1 + R_2);
+
+L_p = f*A_p;
+T_s = 1;  % assumed
+T_p = L_p/(1 + L_p);
+
+Z_mot = 1/(L_m*s + R_m + R_s);
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+#+end_src
+Solving for the value of $R_4$:
+#+begin_src matlab :session :exports both :results output code
+pm_min = 90;  % deg
+L_uncomp1 = T_s*1/f*T_p*Z_mot*R_s/R_5;
+[mag,phase,wout] = bode(L_uncomp1);
+phase = squeeze(phase);
+mag = squeeze(mag);
+
+wc_max = interp1(phase, wout, -180 + pm_min)
+mag_wc_uncomp = interp1(wout, mag, wc_max)
+% Round to kOhm
+R_4 = floor(1/mag_wc_uncomp/1000)*1000  % ohm
+% Use minreal to get rid of zero and pole at s=0
+L = minreal((R_4)*T_s*1/f*T_p*Z_mot*R_s/R_5);
+
+[~,pm,~,wc] = margin(L)
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+wc_max =
+   7.7460e+04
+mag_wc_uncomp =
+   2.5666e-05
+R_4 =
+       38000
+pm =
+   90.2207
+wc =
+   7.5546e+04
+#+end_src
+
+
+** Selecting $C_4$
+This step corresponds to the design of integral control.
+A capacitor $C_4$ in series with $R_4$ makes the loop transfer function achieve higher dc gain, thereby improving the closed-loop tracking and disturbance rejection performance.
+However, $C_4$ can decrease the phase margin.
+Find the value $C_4$ rounded to the nearest \si{\nano\farad} that achieves the highest loop gain while guarangeeing phase margin $\phi_m \ge \SI{85}{\degree}$.
+Draw the Bode plot of the loop transfer function and find $\omega_c$ and $\phi_m$.
+*** Answer
+Implementing a simple binary search for $C_4$:
+#+begin_src matlab :session :exports both :results output code
+C_4max = 1000e-9; 
+C_4min = 1e-9;
+pm_min = 85;  % deg
+iters = 20;
+for i=1:iters
+    C_4 = mean([C_4max C_4min]);
+    L = minreal((1/(C_4*s) + R_4)*T_s*1/f*T_p*Z_mot*R_s/R_5);
+    [~,pm,~,wc] = margin(L);
+    if pm > pm_min
+        C_4max = C_4;
+    elseif pm < pm_min
+        C_4min = C_4;
+    end
+end
+C_4 = ceil(C_4*1e9)*1e-9
+Z_4 = 1/(C_4*s) + R_4;
+L = minreal(Z_4*T_s*1/f*T_p*Z_mot*R_s/R_5);
+[~,pm,~,wc] = margin(L)
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+C_4 =
+   4.0000e-09
+pm =
+   85.2291
+wc =
+   7.5830e+04
+#+end_src
+
+** Including $T_s(s)$
+Using $R_3$, $R_4$, and $C_4$ values obtained above, draw the Bode plot of the final loop transfer function including $T_s(s)$ and find $\omega_c$ and $\phi_m$.
+*** Answer
+Finding $\omega_c$ and $\phi_m$ of our total system:
+#+begin_src matlab :session :exports both :results output code
+Z_345 = (1/R_3 + 1/Z_4 + 1/R_5);
+L_s = 1/(Z_4*Z_345)*A_s;
+L = minreal(Z_4*T_s*1/f*T_p*Z_mot*R_s/R_5)
+[~,pm,~,wc] = margin(L);  % deg, rad/s
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+L =
+ 
+        7.6e10 s + 5e14
+  ---------------------------
+  s^3 + 1.006e06 s^2 + 6e09 s
+ 
+Continuous-time transfer function.
+#+end_src
+
+Plotting the Bode plot:
+#+begin_src matlab :session :results file :exports both
+f_name = 'loop_bode.svg'
+fig = figure('visible', 'off',...
+            'Position', [0 0 600 600]);
+w = logspace(0, 8)
+[mag, phase] = bode(L, w)
+margin(mag, phase, w);
+saveas(fig, f_name);
+ans = f_name;
+#+end_src
+
+#+RESULTS:
+[[file:loop_bode.svg]]
