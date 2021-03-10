@@ -342,19 +342,19 @@ Draw the Bode plot of the loop transfer function and find $\omega_c$ and $\phi_m
 Let's start by inputting the rest of our given parameters:
 #+begin_src matlab :session :exports both :results output code
 s = tf('s');
-A_s = 5e7/s;
-A_p = 1e7/s;
+A_s = 5e7/s;  % V/V
+A_p = 1e7/s;  % V/V
 R_1 = 1e3;  % ohm
 R_2 = 9e3; % ohm
 L_m = 1e-3; % H
-R_m = 5.8; %ohm
+R_m = 5.8; % ohm
 f = R_1/(R_1 + R_2);
 
-L_p = f*A_p;
+L_p = f*A_p;  % V/V
 T_s = 1;  % assumed
-T_p = L_p/(1 + L_p);
+T_p = L_p/(1 + L_p);  % V/V
 
-Z_mot = 1/(L_m*s + R_m + R_s);
+Z_mot = 1/(L_m*s + R_m + R_s);  % ohm
 #+end_src
 
 #+RESULTS:
@@ -372,10 +372,8 @@ wc_max = interp1(phase, wout, -180 + pm_min)
 mag_wc_uncomp = interp1(wout, mag, wc_max)
 % Round to kOhm
 R_4 = floor(1/mag_wc_uncomp/1000)*1000  % ohm
-% Use minreal to get rid of zero and pole at s=0
-L = minreal((R_4)*T_s*1/f*T_p*Z_mot*R_s/R_5);
-
-[~,pm,~,wc] = margin(L)
+% Use minreal to ensure MATLAB doesn't produce extra pole/zero pairs
+L = minreal((R_4)*T_s*1/f*T_p*Z_mot*R_s/R_5)
 #+end_src
 
 #+RESULTS:
@@ -386,12 +384,28 @@ mag_wc_uncomp =
    2.5666e-05
 R_4 =
        38000
+L =
+ 
+          7.6e10
+  -----------------------
+  s^2 + 1.006e06 s + 6e09
+ 
+Continuous-time transfer function.
+#+end_src
+
+Checking our phase margin:
+
+#+begin_src matlab :session :exports both :results output code
+[~, pm, ~, wc] = margin(L)
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
 pm =
    90.2207
 wc =
    7.5546e+04
 #+end_src
-
 
 ** Selecting $C_4$
 This step corresponds to the design of integral control.
@@ -402,45 +416,60 @@ Draw the Bode plot of the loop transfer function and find $\omega_c$ and $\phi_m
 *** Answer
 Implementing a simple binary search for $C_4$:
 #+begin_src matlab :session :exports both :results output code
-C_4max = 1000e-9; 
-C_4min = 1e-9;
+C_4range = [1e-9 1000e-9];  % F
 pm_min = 85;  % deg
-iters = 20;
+iters = 20;  % number of BS iterations 
 for i=1:iters
-    C_4 = mean([C_4max C_4min]);
-    L = minreal((1/(C_4*s) + R_4)*T_s*1/f*T_p*Z_mot*R_s/R_5);
-    [~,pm,~,wc] = margin(L);
+    C_4 = mean(C_4range);
+    Z_4 = 1/(C_4*s) + R_4;
+    L = minreal(Z_4*T_s*1/f*T_p*Z_mot*R_s/R_5);
+    [~, pm, ~, wc] = margin(L);
     if pm > pm_min
-        C_4max = C_4;
+        C_4range(2) = C_4;
     elseif pm < pm_min
-        C_4min = C_4;
+        C_4range(1) = C_4;
     end
 end
-C_4 = ceil(C_4*1e9)*1e-9
-Z_4 = 1/(C_4*s) + R_4;
-L = minreal(Z_4*T_s*1/f*T_p*Z_mot*R_s/R_5);
-[~,pm,~,wc] = margin(L)
+C_4 = ceil(C_4*1e9)*1e-9;  % F
+Z_4 = 1/(C_4*s) + R_4;  % ohm
+L = minreal(Z_4*T_s*1/f*T_p*Z_mot*R_s/R_5)
 #+end_src
 
 #+RESULTS:
 #+begin_src matlab
 C_4 =
    4.0000e-09
+L =
+ 
+        7.6e10 s + 5e14
+  ---------------------------
+  s^3 + 1.006e06 s^2 + 6e09 s
+ 
+Continuous-time transfer function.
+#+end_src
+
+Checking our phase margin:
+
+#+begin_src matlab :session :exports both :results output code
+[~, pm, ~, wc] = margin(L)
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
 pm =
    85.2291
 wc =
    7.5830e+04
 #+end_src
-
 ** Including $T_s(s)$
 Using $R_3$, $R_4$, and $C_4$ values obtained above, draw the Bode plot of the final loop transfer function including $T_s(s)$ and find $\omega_c$ and $\phi_m$.
 *** Answer
 Finding $\omega_c$ and $\phi_m$ of our total system:
 #+begin_src matlab :session :exports both :results output code
-Z_345 = (1/R_3 + 1/Z_4 + 1/R_5);
-L_s = 1/(Z_4*Z_345)*A_s;
+Z_345 = (1/R_3 + 1/Z_4 + 1/R_5);  % 1/ohm
+L_s = 1/(Z_4*Z_345)*A_s;  % V/V
 L = minreal(Z_4*T_s*1/f*T_p*Z_mot*R_s/R_5)
-[~,pm,~,wc] = margin(L);  % deg, rad/s
+[~, pm, ~, wc] = margin(L)  % deg, rad/s
 #+end_src
 
 #+RESULTS:
@@ -452,6 +481,10 @@ L =
   s^3 + 1.006e06 s^2 + 6e09 s
  
 Continuous-time transfer function.
+pm =
+   85.2291
+wc =
+   7.5830e+04
 #+end_src
 
 Plotting the Bode plot:
@@ -459,8 +492,8 @@ Plotting the Bode plot:
 f_name = 'loop_bode.svg'
 fig = figure('visible', 'off',...
             'Position', [0 0 600 600]);
-w = logspace(0, 8)
-[mag, phase] = bode(L, w)
+w = logspace(0, 8);
+[mag, phase] = bode(L, w);
 margin(mag, phase, w);
 saveas(fig, f_name);
 ans = f_name;
