@@ -430,7 +430,7 @@ for i=1:iters
         C_4range(1) = C_4;
     end
 end
-C_4 = ceil(C_4*1e9)*1e-9;  % F
+C_4 = ceil(C_4*1e9)*1e-9  % F
 Z_4 = 1/(C_4*s) + R_4;  % ohm
 L = minreal(Z_4*T_s*1/f*T_p*Z_mot*R_s/R_5)
 #+end_src
@@ -468,6 +468,7 @@ Finding $\omega_c$ and $\phi_m$ of our total system:
 #+begin_src matlab :session :exports both :results output code
 Z_345 = (1/R_3 + 1/Z_4 + 1/R_5);  % 1/ohm
 L_s = 1/(Z_4*Z_345)*A_s;  % V/V
+T_s = L_s/(1 + L_s);  % V/V
 L = minreal(Z_4*T_s*1/f*T_p*Z_mot*R_s/R_5)
 [~, pm, ~, wc] = margin(L)  % deg, rad/s
 #+end_src
@@ -476,15 +477,15 @@ L = minreal(Z_4*T_s*1/f*T_p*Z_mot*R_s/R_5)
 #+begin_src matlab
 L =
  
-        7.6e10 s + 5e14
-  ---------------------------
-  s^3 + 1.006e06 s^2 + 6e09 s
+              9.378e16 s^3 + 1.851e21 s^2 + 1.218e25 s + 2.67e28
+  ---------------------------------------------------------------------------
+  s^6 + 2.26e06 s^5 + 1.283e12 s^4 + 2.404e16 s^3 + 1.522e20 s^2 + 3.221e23 s
  
 Continuous-time transfer function.
 pm =
-   85.2291
+   81.7820
 wc =
-   7.5830e+04
+   7.5302e+04
 #+end_src
 
 Plotting the Bode plot:
