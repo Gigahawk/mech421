@@ -1,0 +1,1027 @@
+#+TITLE: MECH 421 Assignment 5
+#+AUTHOR: Jasper Chan - 37467164
+
+#+OPTIONS: toc:nil
+
+#+LATEX_HEADER: \definecolor{bg}{rgb}{0.95,0.95,0.95}
+#+LATEX_HEADER: \setminted{frame=single,bgcolor=bg,samepage=true}
+#+LATEX_HEADER: \setlength{\parindent}{0pt}
+#+LATEX_HEADER: \usepackage{float}
+#+LATEX_HEADER: \usepackage{svg}
+#+LATEX_HEADER: \usepackage{cancel}
+#+LATEX_HEADER: \usepackage{amssymb}
+#+LATEX_HEADER: \usepackage{mathtools, nccmath}
+#+LATEX_HEADER: \sisetup{per-mode=fraction}
+#+LATEX_HEADER: \newcommand{\Lwrap}[1]{\left\{#1\right\}}
+#+LATEX_HEADER: \newcommand{\Lagr}[1]{\mathcal{L}\Lwrap{#1}}
+#+LATEX_HEADER: \newcommand{\Lagri}[1]{\mathcal{L}^{-1}\Lwrap{#1}}
+#+LATEX_HEADER: \newcommand{\Ztrans}[1]{\mathcal{Z}\Lwrap{#1}}
+#+LATEX_HEADER: \newcommand{\Ztransi}[1]{\mathcal{Z}^{-1}\Lwrap{#1}}
+#+LATEX_HEADER: \newcommand{\ZOH}[1]{\text{ZOH}\left(#1\right)}
+#+LATEX_HEADER: \DeclarePairedDelimiter{\ceil}{\lceil}{\rceil}
+#+LATEX_HEADER: \makeatletter \AtBeginEnvironment{minted}{\dontdofcolorbox} \def\dontdofcolorbox{\renewcommand\fcolorbox[4][]{##4}} \makeatother
+
+#+LATEX_HEADER: \renewcommand\arraystretch{1.2}
+
+#+begin_src ipython :session :results none :exports none
+import numpy as np
+import pandas as pd
+from matplotlib import pyplot as plt
+from sympy import Symbol
+from IPython.display import set_matplotlib_formats
+%matplotlib inline
+set_matplotlib_formats('svg')
+#+end_src
+#+begin_src ipython :session :results none :exports none
+import IPython
+from tabulate import tabulate
+
+class OrgFormatter(IPython.core.formatters.BaseFormatter):
+    def __call__(self, obj):
+        if(isinstance(obj, str)):
+            return None
+        if(isinstance(obj, pd.core.indexes.base.Index)):
+            return None
+        try:
+            return tabulate(obj, headers='keys',
+                            tablefmt='orgtbl', showindex=False)
+        except:
+            return None
+
+ip = get_ipython()
+ip.display_formatter.formatters['text/org'] = OrgFormatter()
+#+end_src
+* Problem 1
+Let us consider the two-degrees of freedom system in Figure [[fig:fig1]].
+Here, two masses $m_1$ and $m_2$ are connected via a spring $k$ and excited by external forces $f_1$ and $f_2$.
+The displacements of the masses are noted as $x_1$ and $x_2$
+
+#+NAME: fig:fig1
+#+ATTR_LATEX: :placement [H] :width 0.6\textwidth
+#+CAPTION: Schematic of a transonductance amplifier.
+[[file:fig1.svg]]
+** Q1
+<<sec:1a>>
+Derive the equations of motion and organize them in the following form
+\begin{align*}
+\mathbf{M}
+\begin{bmatrix}
+\ddot{x_1} \\
+\ddot{x_2}
+\end{bmatrix}
++
+\mathbf{K}
+\begin{bmatrix}
+x_1 \\
+x_2
+\end{bmatrix}
+&=
+\begin{bmatrix}
+f_1 \\
+f_2
+\end{bmatrix}
+\end{align*}
+where $\mathbf{M} \in \mathbb{R}^{2\times2}$ is the mass matrix
+and $\mathbf{K} \in \mathbb{R}^{2\times2}$ is the stiffness matrix.
+*** Answer
+Defining the force inside the spring as:
+\begin{align*}
+f_k = k(x_2 - x_1)
+\end{align*}
+The force on each mass can be defined as:
+\begin{align*}
+m_1\ddot{x_1} &= f_1 + f_k &
+m_2\ddot{x_2} &= f_2 - f_k\\
+m_1\ddot{x_1} - f_k &= f_1 &
+m_2\ddot{x_2} + f_k &=  f_2 \\
+m_1\ddot{x_1} - k(x_2 - x_1) &= f_1 &
+m_2\ddot{x_2} + k(x_2 - x_1) &=  f_2 \\
+m_1\ddot{x_1} + k x_1 - k x_2 &= f_1 &
+m_2\ddot{x_2} - k x_1 + k x_2 &= f_2
+\end{align*}
+We can then write organize these equations as:
+\begin{align*}
+m_1\ddot{x_1} + k x_1 - k x_2 &= f_1 \\
+m_2\ddot{x_2} - k x_1 + k x_2 &= f_2 \\
+\underbrace{
+\begin{bmatrix}
+m_1 & 0 \\
+0 & m_2
+\end{bmatrix}
+}_{\mathbf{M}}
+\begin{bmatrix}
+\ddot{x_1} \\
+\ddot{x_2}
+\end{bmatrix}
++
+\underbrace{
+\begin{bmatrix}
+k & -k \\
+-k & k
+\end{bmatrix}
+}_{\mathbf{K}}
+\begin{bmatrix}
+x_1 \\
+x_2
+\end{bmatrix}
+&=
+\begin{bmatrix}
+f_1 \\
+f_2
+\end{bmatrix}
+\end{align*}
+** Q2
+Find the transfer function matrix $\mathbf{H}(s) \in \mathbb{C}^{2\times2}$ that relates the displacements to forces, i.e.,
+\begin{align*}
+\begin{bmatrix}
+X_1 \\ X_2
+\end{bmatrix}
+&=
+\underbrace{
+\begin{bmatrix}
+H_{11}(s) & H_{12}(s) \\
+H_{21}(s) & H_{22}(s)
+\end{bmatrix}
+}_{\mathbf{H}(s)}
+\begin{bmatrix}
+F_1 \\ F_2
+\end{bmatrix}
+\end{align*}
+(Tip: take the Laplace transform of the equations of motion and then matrix inversion.)
+*** Answer
+Taking the Laplace transform of our answer in Section [[sec:1a]]:
+
+\begin{align*}
+\Lagri{
+\mathbf{M}
+\begin{bmatrix}
+\ddot{x_1} \\
+\ddot{x_2}
+\end{bmatrix}
++
+\mathbf{K}
+\begin{bmatrix}
+x_1 \\
+x_2
+\end{bmatrix}
+}
+&=
+\Lagri{
+\begin{bmatrix}
+f_1 \\
+f_2
+\end{bmatrix}
+} \\
+\mathbf{M}
+\begin{bmatrix}
+X_1 \\
+X_2
+\end{bmatrix}
+s^2
++
+\mathbf{K}
+\begin{bmatrix}
+X_1 \\
+X_2
+\end{bmatrix}
+&=
+\begin{bmatrix}
+F_1 \\
+F_2
+\end{bmatrix} \\
+\left(
+\mathbf{M}
+s^2
++
+\mathbf{K}
+\right)
+\begin{bmatrix}
+X_1 \\
+X_2
+\end{bmatrix}
+&=
+\begin{bmatrix}
+F_1 \\
+F_2
+\end{bmatrix} \\
+\begin{bmatrix}
+X_1 \\
+X_2
+\end{bmatrix}
+&=
+\underbrace{
+\left(
+\mathbf{M}
+s^2
++
+\mathbf{K}
+\right)^{-1}
+}_{\mathbf{H}(s)}
+\begin{bmatrix}
+F_1 \\
+F_2
+\end{bmatrix} \\
+\end{align*}
+Evaluating $\mathbf{H}(s)$:
+\begin{align*}
+\mathbf{H}(s)
+&=
+\left(
+\mathbf{M}
+s^2
++
+\mathbf{K}
+\right)^{-1} \\
+&=
+\left(
+\begin{bmatrix}
+m_1 & 0 \\
+0 & m_2
+\end{bmatrix}
+s^2
++
+\begin{bmatrix}
+k & -k \\
+-k & k
+\end{bmatrix}
+\right)^{-1} \\
+&=
+\begin{bmatrix}
+m_1 s^2 + k & -k \\
+-k & m_2 s^2 + k
+\end{bmatrix}^{-1} \\
+&=
+\frac{1}
+{(m_1 s^2 + k)(m_2 s^2 + k) - (-k)(-k)}
+\begin{bmatrix}
+m_2 s^2 + k & k \\
+k & m_1 s^2 + k
+\end{bmatrix} \\
+&=
+\frac{1}
+{m_1 m_2 s^4 + m_1 k s^2 + m_2 k s^2 + k^2 - k^2}
+\begin{bmatrix}
+m_2 s^2 + k & k \\
+k & m_1 s^2 + k
+\end{bmatrix} \\
+&=
+\frac{1}
+{s^2(m_1 m_2 s^2 + m_1 k + m_2 k)}
+\begin{bmatrix}
+m_2 s^2 + k & k \\
+k & m_1 s^2 + k
+\end{bmatrix} \\
+\end{align*}
+** Q3
+Manually draw the pole-zero maps and Bode plots of $H_{11}(s)$ and $H_{21}(s)$.
+Show the pole-zero locations and break frequencies in terms of
+$m_1$,
+$m_2$, and
+$k$.
+*** Answer for $H_{11}(s)$
+\begin{align*}
+H_{11}(s)
+&=
+\frac{m_2 s^2 + k}
+{s^2(m_1 m_2 s^2 + m_1 k + m_2 k)}
+\end{align*}
+There is one set of zeros at:
+\begin{align*}
+m_2 s^2 + k &= 0 \\
+m_2 s^2 &= -k \\
+s^2 &= \frac{-k}{m_2} \\
+s &= \pm \sqrt{\frac{-k}{m_2}} \\
+s &= \pm j\sqrt{\frac{k}{m_2}}  = \pm j\omega_{n2} 
+\end{align*}
+
+There are two sets of poles at:
+\begin{align*}
+s^2 &= 0 &
+m_1 m_2 s^2 + m_1 k + m_2 k &= 0 \\
+s &= 0 &
+m_1 m_2 s^2  &= -k(m_1 + m_2)  \\
+& &
+s^2 &= \frac{-k(m_1 + m_2)}{m_1 m_2}  \\
+& &
+s &= \pm\sqrt{\frac{-k(m_1 + m_2)}{m_1 m_2}}  \\
+& &
+s &= \pm j \sqrt{\frac{k(m_1 + m_2)}{m_1 m_2}}
+= \pm j \sqrt{\frac{k}{m_1 \parallel m_2}}
+= \pm j\omega_{n1 \parallel 2} 
+\end{align*}
+Plotting the pole-zero map:
+
+#+ATTR_LATEX: :placement [H]
+[[file:1.3.1_pz.svg]]
+
+For the Bode plot, we have two break frequencies $\omega_{n2}$ and $\omega_{n1\parallel 2}$.
+When $\omega \ll \omega_{n2}$, we expect a gain slope of $10^2$ per decade.
+Likewise when $\omega \gg \omega_{n1\parallel 2}$, we also expect a gain slope of $10^2$ per decade.
+
+To find the gain when $\omega_{n2} \ll \omega \ll \omega_{n1\parallel 2}$, let's first rearrange $H_{11}(s)$:
+\begin{align*}
+H_{11}(s)
+&=
+\frac{m_2 s^2 + k}
+{s^2(m_1 m_2 s^2 + m_1 k + m_2 k)} \\
+&=
+\left(
+\frac{1}{s^2}
+\right)
+\left(
+m_2 s^2 + k
+\right)
+\left(
+\frac{1}
+{m_1 m_2 s^2 + m_1 k + m_2 k}
+\right) \\
+&=
+\left(
+\frac{1}{s^2}
+\right)
+\left(
+m_2
+\left(s^2 + \frac{k}{m_2}\right)
+\right)
+\left(
+\frac{1}{m_1 m_2}
+\frac{1}
+{s^2 + \frac{k}{m_1} + \frac{k}{m_2}}
+\right) \\
+&=
+\frac{1}{m_1}
+\left(
+\frac{1}{s^2}
+\right)
+\left(
+s^2 + \frac{k}{m_2}
+\right)
+\left(
+\frac{1}
+{s^2 + k\frac{m_1 + m_2}{m_1 m_2}}
+\right) \\
+&=
+\frac{1}{m_1}
+\frac{
+s^2 + \frac{k}{m_2}
+}
+{
+s^2
+\left(
+s^2 + k\frac{m_1 + m_2}{m_1 m_2}
+\right)
+}
+\end{align*}
+
+The gain is then:
+\begin{align*}
+|H_{11}(j\omega)|
+&=
+\frac{1}{m_1}
+\left|
+\frac{
+\omega^2 - \frac{k}{m_2}
+}
+{
+\omega^2
+\left(
+\omega^2 - k\frac{m_1 + m_2}{m_1 m_2}
+\right)
+}
+\right|
+\end{align*}
+
+We can then approximate
+\begin{align*}
+|H_{11}(s)|_{\omega_{n2} \ll \omega \ll \omega_{n1\parallel 2}}
+&\approx
+\frac{1}{m_1}
+\left|
+\frac{
+\omega^2
+}
+{
+\omega^2
+\left(
+- k\frac{m_1 + m_2}{m_1 m_2}
+\right)
+}
+\right| \\
+&\approx
+\frac{1}{m_1}
+\left|
+\frac{
+1
+}
+{
+- k\frac{m_1 + m_2}{m_1 m_2}
+}
+\right| \\
+&\approx
+\left|
+\frac{
+1
+}
+{
+- k\frac{m_1 + m_2}{m_2}
+}
+\right| \\
+&\approx
+\frac{
+m_2
+}
+{
+k(m_1 + m_2)
+}
+\end{align*}
+
+Because all of the poles and zeros have damping ratio $\zeta = 0$, the gain at a break frequency is 0 for a zero and $\infty$ for a pole. 
+We also expect the phase to sharply transition at the break frequencies.
+
+#+ATTR_LATEX: :placement [H]
+[[file:1.3.1_bode.svg]]
+
+*** Answer for $H_{21}(s)$
+\begin{align*}
+H_{21}(s)
+&=
+\frac{k}
+{s^2(m_1 m_2 s^2 + m_1 k + m_2 k)}
+\end{align*}
+
+There are two sets of poles at:
+\begin{align*}
+s &= 0, \pm j\omega_{n1 \parallel 2} 
+\end{align*}
+
+The pole zero plot is then: 
+#+ATTR_LATEX: :placement [H]
+[[file:1.3.2_pz.svg]]
+
+For the Bode plot, we have one break frequency $\omega_{n1\parallel 2}$.
+When $\omega \ll \omega_{n1\parallel 2}$, we expect a gain slope of $10^2$ per decade.
+When $\omega \gg \omega_{n1\parallel 2}$, we expect a gain slope of $10^4$ per decade.
+
+To find the gain of the intersection point between the two asymptotes, let's first rearrange $H_{21}(s)$:
+\begin{align*}
+H_{21}(s)
+&=
+\frac{k}
+{s^2(m_1 m_2 s^2 + m_1 k + m_2 k)} \\
+&=
+k
+\left(
+\frac{1}{s^2}
+\right)
+\left(
+\frac{1}
+{m_1 m_2 s^2 + m_1 k + m_2 k}
+\right) \\
+&=
+\frac{k}{m_1 m_2}
+\left(
+\frac{1}{s^2}
+\right)
+\left(
+\frac{1}
+{s^2 + \frac{k}{m_1} + \frac{k}{m_2}}
+\right) \\
+&=
+\frac{k}{m_1 m_2}
+\left(
+\frac{1}{s^2}
+\right)
+\left(
+\frac{1}
+{s^2 + k\frac{m_1 + m_2}{m_1 m_2}}
+\right) \\
+&=
+\frac{k}{m_1 m_2}
+\frac{1}
+{s^2
+\left(
+s^2 + k\frac{m_1 + m_2}{m_1 m_2}
+\right)
+}
+\end{align*}
+
+The intersect is then found by evaluating $H_{21}(s)$ at $\omega_{n1\parallel 2}$ without the second pole:
+
+\begin{align*}
+|H_{21}^\prime(j\omega)|_{\omega = \omega_{n1\parallel 2}}
+&=
+\frac{k}{m_1 m_2}
+\frac{1}
+{\omega^2} \\
+&=
+\frac{k}{m_1 m_2}
+\frac{m_1 m_2}
+{k(m_1 + m_2)} \\
+&=
+\frac{1}{m_1 + m_2}
+\end{align*}
+Because the poles have damping ratio $\zeta = 0$, the gain at the break frequency is $\infty$. 
+We also expect the phase to sharply transition at the break frequencies.
+
+#+ATTR_LATEX: :placement [H]
+[[file:1.3.2_bode.svg]]
+
+
+* Problem 2
+Manually draw the pole-zero maps and Bode plots of the following second-order systems.
+Clearly show the break frequencies, asymptotes, and $\SI{-3}{\decibel}$ bandwidth $\omega_h$ in the Bode plots.
+
+For the systems exhibiting a resonance - clearly show in the *pole-zero map* the natural frequency $\omega_n$, damped natural frequency $\omega_d$, and decay rate $\sigma$; and in the *Bode plot* the natural frequency $\omega_n$, quality factor $Q$, resonance frequency $\omega_r$, and resonance peak $M_r$.
+** Q1
+\begin{align*}
+H_a(s) =
+\frac
+{10}
+{
+s^2 +
+101s +
+100
+}
+\end{align*}
+*** Answer
+Factoring to find the poles:
+\begin{align*}
+H_a(s)
+&=
+\frac
+{10}
+{
+s^2 +
+101s +
+100
+} \\
+&=
+\frac
+{10}
+{
+(s + 1)(s + 100)
+}
+\end{align*}
+
+The pole zero plot is then:
+
+#+ATTR_LATEX: :placement [H]
+[[file:2.1.1_pz.svg]]
+
+For the Bode plot, at DC, $H_a = \frac{10}{100} = 0.1$.
+Realistically the half power bandwidth should be roughly equal to the first break frequency, however since the question specifically asks for it I will go through the derivation
+\begin{align*}
+|H_a(j\omega)|_{\omega=\omega_h}
+=
+\frac{|H_a(j\omega)|_{\omega=0}}{\sqrt{2}}
+=
+\frac{0.1}{\sqrt{2}}
+&=
+\frac
+{10}
+{
+\sqrt{\omega_h^2 + 1}\sqrt{\omega_h^2 + 100^2}
+} \\
+\frac{0.01}{\sqrt{2}}
+&=
+\frac
+{1}
+{
+\sqrt{\omega_h^2 + 1}\sqrt{\omega_h^2 + 100^2}
+} \\
+\frac{\sqrt{2}}{0.01}
+&=
+\sqrt{\omega_h^2 + 1}\sqrt{\omega_h^2 + 100^2} \\
+\frac{2}{0.01^2}
+&=
+(\omega_h^2 + 1)(\omega_h^2 + 100^2) \\
+&=
+\omega_h^4 + 10001\omega_h^2 + 10000 \\
+0
+&=
+\omega_h^4 + 10001\omega_h^2 +
+\left(
+10000 -
+\frac{2}{0.01^2}
+\right) \\
+\omega_h^2
+&=
+\frac{
+-10001 \pm \sqrt{10001^2 - 4(10000 - \frac{2}{0.01^2})}
+}{2}
+\end{align*}
+
+Plugging our numbers into a calculator:
+#+begin_src ipython :session :results raw drawer :exports both
+b = 100**2 + 1
+c = 100**2 - (2/0.01**2)
+wh2 = 0.5*(-b + np.sqrt(b**2 - 4*c))
+wh = np.sqrt(wh2)
+wh
+#+end_src
+
+#+RESULTS:
+:results:
+# Out[106]:
+: 0.9999000249915201
+:end:
+Of course, this is close enough to 1 that it wouldn't be visible on the plot.
+
+Note that damping ratio $\zeta > 1$, hence the system is overdamped and there is no resonance.
+
+The Bode plot is then:
+
+#+ATTR_LATEX: :placement [H]
+[[file:2.1.1_bode.svg]]
+
+** Q2
+\begin{align*}
+H_b(s) =
+\frac
+{10}
+{
+s^2 +
+20 s +
+100
+}
+\end{align*}
+*** Answer
+Factoring to find the poles:
+\begin{align*}
+H_b(s)
+&=
+\frac
+{10}
+{
+s^2 +
+20 s +
+100
+} \\
+&=
+\frac
+{10}
+{
+(s + 10)^2
+}
+\end{align*}
+The pole zero plot is then:
+
+#+ATTR_LATEX: :placement [H]
+[[file:2.2.1_pz.svg]]
+
+For the Bode plot, at DC, $H_b = \frac{10}{100} = 0.1$.
+For a system with two poles in close proximity (or in the same location in this case), the bandwidth $\omega_h$ will be lower than the pole location.
+\begin{align*}
+|H_b(j\omega)|_{\omega=\omega_h}
+=
+\frac{|H_b(j\omega)|_{\omega=0}}{\sqrt{2}}
+=
+\frac{0.1}{\sqrt{2}}
+&=
+\frac
+{10}
+{
+\omega_h^2 + 10^2
+} \\
+\frac{0.01}{\sqrt{2}}
+&=
+\frac
+{1}
+{
+\omega_h^2 + 10^2
+} \\
+\frac{\sqrt{2}}{0.01}
+&=
+\omega_h^2 + 10^2 \\
+\frac{2}{0.01^2}
+&=
+(\omega_h^2 + 10^2)^2 \\
+&=
+\omega_h^4 + 2(10^2)\omega_h^2 + 10^4 \\
+0
+&=
+\omega_h^4 + 2(10^2)\omega_h^2 +
+\left(
+10^4 - 
+\frac{2}{0.01^2}
+\right) \\
+\omega_h^2
+&=
+\frac{
+-2(10^2) \pm \sqrt{(2(10^2))^2 - 4(10^4 - \frac{2}{0.01^2})}
+}{2}
+\end{align*}
+
+Plugging our numbers into a calculator:
+#+begin_src ipython :session :results raw drawer :exports both
+b = 2*10**2
+c = 10**4 - (2/0.01**2)
+wh2 = 0.5*(-b + np.sqrt(b**2 - 4*c))
+wh = np.sqrt(wh2)
+wh
+#+end_src
+
+#+RESULTS:
+:results:
+# Out[157]:
+: 6.4359425290558265
+:end:
+
+In this case, $\zeta = 1$, hence the system is critically damped and there is no resonance.
+
+The Bode plot is then:
+
+#+ATTR_LATEX: :placement [H]
+[[file:2.2.1_bode.svg]]
+
+** Q3
+\begin{align*}
+H_c(s) =
+\frac
+{10}
+{
+s^2 +
+2 s +
+100
+}
+\end{align*}
+*** Answer
+Using the quadratic formula to find the poles:
+\begin{align*}
+s
+&=
+\frac
+{
+-2
+\pm
+\sqrt{
+(2)^2 - 4(1)(100)
+}
+}
+{2} \\
+&=
+\frac
+{
+-2
+\pm
+j
+\sqrt{
+396
+}
+}
+{2} \\
+&=
+-1
+\pm
+j
+\frac{
+\sqrt{
+396
+}
+}
+{2}
+\end{align*}
+
+The pole zero plot is then:
+
+#+ATTR_LATEX: :placement [H]
+[[file:2.3.1_pz.svg]]
+
+For the Bode plot, at DC, $H_c = \frac{10}{100} = 0.1$.
+Here $\zeta = 0.1$ so the system is underdamped and oscillates.
+
+Because the system resonates, the bandwidth $\omega_h$ is pushed past the break frequency by the resonance peak.
+
+First, we need to solve for |H_c(j\omega)|:
+\begin{align*}
+H_c(s)
+&=
+K
+\frac{1}
+{s^2 + 2\zeta\omega_n s + \omega_n^2} \\
+H_c(j\omega)
+&=
+K
+\frac{1}
+{(j\omega)^2 + 2\zeta\omega_n (j\omega) + \omega_n^2} \\
+&=
+K
+\frac{1}
+{(\omega_n^2 -\omega^2) + j(2\zeta\omega_n\omega)}
+\times
+\frac
+{(\omega_n^2 -\omega^2) - j(2\zeta\omega_n\omega)}
+{(\omega_n^2 -\omega^2) - j(2\zeta\omega_n\omega)} \\
+&=
+K
+\frac
+{(\omega_n^2 -\omega^2) - j(2\zeta\omega_n\omega)}
+{(\omega_n^2 -\omega^2)^2 + (2\zeta\omega_n\omega)^2} \\
+|H_c(j\omega)|
+&=
+K
+\frac
+{\sqrt{(\omega_n^2 -\omega^2)^2 + (2\zeta\omega_n\omega)^2}}
+{(\omega_n^2 -\omega^2)^2 + (2\zeta\omega_n\omega)^2} \\
+&=
+K
+\frac
+{1}
+{\sqrt{(\omega_n^2 -\omega^2)^2 + (2\zeta\omega_n\omega)^2}}
+\end{align*}
+
+Rearranging to solve for $\omega$ in terms of $|H_c(j\omega)|$:
+\begin{align*}
+|H_c(j\omega)|
+&=
+K
+\frac
+{1}
+{\sqrt{(\omega_n^2 -\omega^2)^2 + (2\zeta\omega_n\omega)^2}} \\
+\frac{K}{|H_c(j\omega)|}
+&= 
+\sqrt{(\omega_n^2 -\omega^2)^2 + (2\zeta\omega_n\omega)^2} \\
+\left(
+\frac{K}{|H_c(j\omega)|}
+\right)^2
+&= 
+(\omega_n^2 - \omega^2)^2 + (2\zeta\omega_n\omega)^2 \\
+&=
+(\omega_n^4 - 2\omega_n^2\omega^2 + \omega^4) +
+(2\zeta\omega_n)^2\omega^2 \\
+&=
+\omega^4 + ((2\zeta\omega_n)^2 - 2\omega_n^2)\omega^2 + \omega_n^4 \\
+0
+&=
+\omega^4 + ((2\zeta\omega_n)^2 - 2\omega_n^2)\omega^2 +
+\left(
+\omega_n^4
+-
+\left(
+\frac{K}{|H_c(j\omega)|}
+\right)^2
+\right) \\
+\omega^2
+&=
+\frac{
+-((2\zeta\omega_n)^2 - 2\omega_n^2) \pm
+\sqrt{
+((2\zeta\omega_n)^2 - 2\omega_n^2)^2 -
+4
+\left(
+\omega_n^4
+-
+\left(
+\frac{K}{|H_c(j\omega)|}
+\right)^2
+\right)
+}
+}
+{2}
+\end{align*}
+
+Plugging our numbers in for bandwidth:
+#+begin_src ipython :session :results raw drawer :exports both
+K = 10
+wn = 10
+zeta = 0.1
+bw_gain = 0.1/np.sqrt(2)
+
+b = (2*zeta*wn)**2 - 2*wn**2
+c = wn**4 - (K/bw_gain)**2
+wh2 = 0.5*(-b + np.sqrt(b**2 - 4*c))
+wh = np.sqrt(wh2)
+wh
+#+end_src
+
+#+RESULTS:
+:results:
+# Out[254]:
+: 15.427711592634116
+:end:
+
+Calculating quality factor $Q$:
+#+begin_src ipython :session :results raw drawer :exports both
+Q = 1/(2*zeta)
+Q
+#+end_src
+
+#+RESULTS:
+:results:
+# Out[255]:
+: 5.0
+:end:
+
+Calculating resonance frequency $\omega_r$:
+#+begin_src ipython :session :results raw drawer :exports both
+wr = wn*np.sqrt(1 - 2*zeta**2)
+wr
+#+end_src
+
+#+RESULTS:
+:results:
+# Out[257]:
+: 9.899494936611665
+:end:
+
+Calculating resonance peak $M_r$:
+#+begin_src ipython :session :results raw drawer :exports both
+M_r = 1/(2*zeta)/(np.sqrt(1 - zeta**2))
+M_r
+#+end_src
+
+#+RESULTS:
+:results:
+# Out[260]:
+: 5.02518907629606
+:end:
+
+Sovlving for $\omega_1$ and $\omega_2$:
+\begin{align*}
+Q
+&= 
+\frac{\omega_n}{\omega_2 - \omega_1} \\
+\omega_2 - \omega_1 = \Delta\omega
+&= \frac{\omega_n}{Q}
+\end{align*}
+Plugging into a calculator
+#+begin_src ipython :session :results raw drawer :exports both
+dw = wn/Q
+w1 = wn - dw/2
+w2 = wn + dw/2
+(w1, w2)
+#+end_src
+
+#+RESULTS:
+:results:
+# Out[261]:
+: (9.0, 11.0)
+:end:
+
+The Bode plot is then:
+
+#+ATTR_LATEX: :placement [H]
+[[file:2.3.1_bode.svg]]
+
+** Q4
+\begin{align*}
+H_d(s) =
+\frac
+{s}
+{
+s^2 +
+2 s +
+100
+}
+\end{align*}
+*** Answer
+The poles are:
+\begin{align*}
+s
+&=
+-1
+\pm
+j
+\frac{
+\sqrt{
+396
+}
+}
+{2}
+\end{align*}
+
+The pole zero plot is then:
+
+#+ATTR_LATEX: :placement [H]
+[[file:2.4.1_pz.svg]]
+
+Because this is effectively a band pass filter, there is no gain at DC, and hence the notion of $\SI{-3}{\decibel}$ from DC bandwidth doesn't really mean anything.
+Instead, I will be using $\omega_1$ and $\omega_2$ as the bandwidth, which is are the points $\SI{-3}{\decibel}$ from the resonance peak.
+The Bode plot should also be symmetrical around $\omega_n = \omega_r$, and hence $Q = M_r$
+
+Calculating quality factor $Q$:
+#+begin_src ipython :session :results raw drawer :exports both
+zeta = 0.1
+Q = 1/(2*zeta)
+Q
+#+end_src
+
+Calculating $\omega_1$ and $\omega_2$:
+#+begin_src ipython :session :results raw drawer :exports both
+dw = wn/Q
+w1 = wn - dw/2
+w2 = wn + dw/2
+(w1, w2)
+#+end_src
+
+#+RESULTS:
+:results:
+# Out[271]:
+: (9.0, 11.0)
+:end:
+
+The Bode plot is then:
+
+#+ATTR_LATEX: :placement [H]
+[[file:2.4.1_bode.svg]]
+
