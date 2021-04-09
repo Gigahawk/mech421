@@ -140,7 +140,7 @@ From the lab manual, we want a controller with:
 
 Unfortunately, it looks like the dip in the phase plot at around $\SI{300}{\radian\per\second}$ will prevent us from taking full advantage of the phase peak at about $\SI{500}{\radian\per\second}$.
 We would have to place the crossover point at nearly $\SI{2000}{\radian\per\second}$, which would require multiple compensators to provide enough phase margin, which would significantly increase high frequency gain.
-Instead, in order to avoid having multiple crossover points, let's place the crossover frequency at $\SI{150}{\radian\per\second}$[fn:gainmargin]
+Instead, in order to avoid having multiple crossover points, let's place the crossover frequency at $\SI{140}{\radian\per\second}$[fn:gainmargin]
 
 [fn:gainmargin] Note that this will leave us with very little gain margin.
 Because the lab report does not specify a minimum gain margin and we are working with a simulated system, this is of little concern.
