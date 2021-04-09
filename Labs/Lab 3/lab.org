@@ -472,6 +472,7 @@ f_name = 'norm_steps.svg'
 fig = figure('visible', 'off',...
             'Position', [0 0 600 800]);
 colors = turbo(10);
+linestyles = {'-', '--', '-.'};
 legends = {};
 subplot(3, 1, 1);
 for i = 1:size(r_steps, 2)
@@ -480,7 +481,7 @@ for i = 1:size(r_steps, 2)
     resp = no_lim_step_resps(i);
     t = resp.y.Time;
     y = resp.y.Data;
-    plot(t, y/r_step, 'Color', colors(i,:));
+    plot(t, y/r_step, linestyles{mod(i, 3) + 1}, 'Color', colors(i,:));
     legends{i} = sprintf('x: %.1f mm', x_step);
     hold on;
 end
@@ -494,7 +495,7 @@ for i = 1:size(r_steps, 2)
     resp = lim_step_resps(i);
     t = resp.y.Time;
     y = resp.y.Data;
-    plot(t, y/r_step, 'Color', colors(i,:));
+    plot(t, y/r_step, linestyles{mod(i, 3) + 1}, 'Color', colors(i,:));
     hold on;
 end
 title('Step response with integrator limit');
