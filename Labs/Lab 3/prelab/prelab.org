@@ -1,0 +1,599 @@
+#+TITLE: MECH 421 Prelab 3
+#+AUTHOR: Jasper Chan - 37467164
+
+#+OPTIONS: toc:nil
+
+#+LATEX_HEADER: \definecolor{bg}{rgb}{0.95,0.95,0.95}
+#+LATEX_HEADER: \setminted{frame=single,bgcolor=bg,samepage=true}
+#+LATEX_HEADER: \setlength{\parindent}{0pt}
+#+LATEX_HEADER: \usepackage{float}
+#+LATEX_HEADER: \usepackage{svg}
+#+LATEX_HEADER: \usepackage{cancel}
+#+LATEX_HEADER: \usepackage{amssymb}
+#+LATEX_HEADER: \usepackage{mathtools, nccmath}
+#+LATEX_HEADER: \sisetup{per-mode=fraction}
+#+LATEX_HEADER: \newcommand{\Lwrap}[1]{\left\{#1\right\}}
+#+LATEX_HEADER: \newcommand{\Lagr}[1]{\mathcal{L}\Lwrap{#1}}
+#+LATEX_HEADER: \newcommand{\Lagri}[1]{\mathcal{L}^{-1}\Lwrap{#1}}
+#+LATEX_HEADER: \newcommand{\Ztrans}[1]{\mathcal{Z}\Lwrap{#1}}
+#+LATEX_HEADER: \newcommand{\Ztransi}[1]{\mathcal{Z}^{-1}\Lwrap{#1}}
+#+LATEX_HEADER: \newcommand{\ZOH}[1]{\text{ZOH}\left(#1\right)}
+#+LATEX_HEADER: \DeclarePairedDelimiter{\ceil}{\lceil}{\rceil}
+#+LATEX_HEADER: \makeatletter \AtBeginEnvironment{minted}{\dontdofcolorbox} \def\dontdofcolorbox{\renewcommand\fcolorbox[4][]{##4}} \makeatother
+
+#+LATEX_HEADER: \renewcommand\arraystretch{1.2}
+
+#+begin_src ipython :session :results raw drawer :exports none
+import numpy as np
+import pandas as pd
+import os
+from matplotlib import pyplot as plt
+from sympy import Symbol
+from PySpice.Spice.Netlist import Circuit, SubCircuitFactory
+from PySpice.Spice.Library import SpiceLibrary
+from PySpice.Plot.BodeDiagram import bode_diagram
+from IPython.display import set_matplotlib_formats
+import shutil
+%matplotlib inline
+set_matplotlib_formats('svg')
+#+end_src
+
+#+RESULTS:
+:results:
+# Out[1]:
+:end:
+
+#+begin_src ipython :session :results raw drawer :exports none
+import IPython
+from tabulate import tabulate
+
+class OrgFormatter(IPython.core.formatters.BaseFormatter):
+    def __call__(self, obj):
+        if(isinstance(obj, list)):
+            return None
+        if(isinstance(obj, str)):
+            return None
+        if(isinstance(obj, pd.core.indexes.base.Index)):
+            return None
+        try:
+            return tabulate(obj, headers='keys',
+                            tablefmt='orgtbl', showindex=False)
+        except:
+            return None
+
+ip = get_ipython()
+ip.display_formatter.formatters['text/org'] = OrgFormatter()
+#+end_src
+
+#+RESULTS:
+:results:
+# Out[2]:
+:end:
+
+* Q1
+Calculate the dc gain and bandwidth of the transconductance from $V_i$ to $I_o$
+** Answer
+From Prelab 2 the DC gain from $V_{Ir}$ (labelled as $V_i$ in this lab) to $I_o$ is:
+\begin{align*}
+\text{DC Gain} &=
+\left|
+\frac{-1}{Z_3}
+\frac{Z_5}{R_s}
+\right| \\
+&=
+\frac{R_5}{R_3 R_s} & Z_3 = R_3, Z_5 = R_5
+\end{align*}
+
+Plugging in our values:
+#+begin_src matlab :session :results output code :exports both
+% From prelab 2
+R_s = 0.2;  % ohm
+% From prelab 3
+R_3 = 4.7e3;  % ohm
+R_5 = 1e3;  % ohm
+dc_gain = R_5/(R_3*R_s)  % 1/ohm = A/V
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+dc_gain =
+    1.0638
+#+end_src
+* Q2
+Draw a block diagram for the lateral positioning stage and find the plant transfer function
+\begin{equation*}
+P(s) = \frac{Y(s)}{U(s)}
+\end{equation*}
+where $u$ is the control effort (DAC input) and $y$ is the measurement (ADC output).
+- Assume that $u$ and $y$ are continuous-time signals.
+- Approximate the amplifier as a first-order system.
+** Answer
+#+begin_src matlab :session :results none :exports none :eval never-export
+simulink
+#+end_src
+Plugging in the provided values:
+#+begin_src matlab :session :results output code :exports both
+K_adc = 0.1;  % count/V
+K_dac = 10;  % V/count
+J_1 = 0.000190;  % kg/m^2
+J_2 = 0.000204;  % kg/m^2
+J_3 = 0.000166;  % kg/m^2
+m_1 = 0.4455;  % kg
+m_2 = 4.2882;  % kg
+r = 0.0316;  % m
+K_t = 0.1963;  % Nm/A
+K_lvdt = 0.035;  % V/mm
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+#+end_src
+
+We have been asked to approximate the amplifier as a first order system.
+Plugging in the component values chosen the Lab 3 manual into the code written for Prelab 2, we get a bandwidth of about $\omega_h \approx \SI{130}{\kilo\radian\per\second}$, our amplifier transfer function is then:
+\begin{equation*}
+G_\text{amp} = 
+K_\text{DC}
+\frac{1}{1 + \frac{s}{\omega_h}}
+\end{equation*}
+Plugging in our values:
+#+begin_src matlab :session :results output code :exports both
+s = tf('s');
+omega_h = 130e3;  % rad/s
+% Ignoring negative, again we can just flip the motor wires to compensate
+G_amp = dc_gain/(1 + (s/omega_h))  % A/V
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+G_amp =
+ 
+   1.383e05
+  ----------
+  s + 130000
+ 
+Continuous-time transfer function.
+#+end_src
+
+Now we need to calculate the equivalent inertia seen by the motor.
+Assuming that there is no backlash in the system, we can calculate the equivalent inertia as the sum of all inertias in the system.
+#+begin_src matlab :session :results output code :exports both
+% equivalent inertia of slider block and belt
+J_l = (m_1 + m_2)*r^2;  % kg/m^2
+J_e = J_1 + J_2 + J_3 + J_l  % kg/m^2
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+J_e =
+    0.0053
+#+end_src
+
+Assuming no friction, the mechanical system transfer function is then:
+#+begin_src matlab :session :results output code :exports both
+G_m = 1/(J_e*s)  % rad/Nm
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+G_m =
+ 
+      1
+  ----------
+  0.005287 s
+ 
+Continuous-time transfer function.
+#+end_src
+
+Our block diagram is then:
+#+begin_src matlab :session :results none :exports code
+open_system('G_analog');
+print -dsvg -s 'G_analog.svg';
+#+end_src
+#+begin_src shell :exports results :results file
+inkscape G_analog.svg --export-text-to-path --export-plain-svg -o G_analog_fixed.svg
+printf 'G_analog_fixed.svg'
+#+end_src
+
+#+RESULTS:
+[[file:G_analog_fixed.svg]]
+* Q3
+Draw the Bode plot of $P(s)$ and compare it with the experimentally measured plant frequency response in Figure [[fig:fig3]].
+Discuss the differences between the model and measurements, and explain possible sources of discrepancy in low frequencies and high frequencies.
+
+#+NAME: fig:fig3
+#+CAPTION: Experimentally measured frequency response of the plant.
+[[file:fig3.svg]]
+** Answer
+Defining our plant model:
+#+begin_src matlab :session :results output code :exports both
+P = K_dac*G_amp*K_t*G_m*r*1000*K_lvdt*K_adc  % count/count
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+P =
+ 
+         3.003e04
+  ----------------------
+  0.005287 s^2 + 687.3 s
+ 
+Continuous-time transfer function.
+#+end_src
+
+Loading the measured data:
+#+begin_src matlab :session :results output code :exports both
+load('Lab3-Plant-FRF-2021');
+freq = FRF(1,:);  % Hz
+P_meas = FRF(2,:);
+mag_meas = abs(P_meas);  % abs
+phase_meas = unwrap(angle(P_meas))*180/pi;  % deg
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+#+end_src
+
+Plotting the frequency responses:
+#+begin_src matlab :session :results file :exports both
+f_name = 'plant_bode.svg';
+fig = figure('visible', 'off',...
+            'Position', [0 0 600 600]);
+[mag, phase, wout] = bode(P, freq*(2*pi));
+mag = squeeze(mag);  % abs
+phase = squeeze(phase);  % deg
+subplot(2, 1, 1);
+loglog(freq, mag)
+title('Bode Diagram');
+hold on;
+loglog(freq, mag_meas);
+hold off;
+grid on;
+l = legend('Model', 'Measured');
+set(l, 'color', 'none', 'edgecolor', 'none')
+ylabel('Magnitude [abs]');
+subplot(2, 1, 2);
+semilogx(freq, phase)
+ylabel('Phase [deg]');
+xlabel('Frequency [Hz]');
+hold on;
+semilogx(freq, phase_meas)
+hold off;
+grid on;
+saveas(fig, f_name);
+ans = f_name;
+#+end_src
+
+#+RESULTS:
+[[file:plant_bode.svg]]
+
+The measured data significantly deviates from the model in both low and high frequencies.
+At low frequencies, we see that the measured data roughly matches a second order spring mass damper system, with a $\SI{-40}{\decibel}$ slope after about $\SI{1}{\hertz}$.
+This indicates that alongside the inertia, there is also some damping from friction as well as stiffness of the components in the system, which we did not model.
+At high frequencies, we run into the limits of our discretization time, and the controller is no longer able to keep up at about $\SI{150}{\hertz}$.
+There should also be error caused by backlash, which effectively acts as a delay block internal to the mechanical system.
+* Q4
+Referring to Figure [[fig:fig4]], design a controller $C(s)$ that generates the control effort $u$ based on the position measurement $y$ and the reference $r$.
+Also, find the constant gain block $H$ that makes $x [\si{\milli\meter}] = x_\text{ref} [\si{\milli\meter}]$ when $e = 0$.
+
+The data for Figure [[fig:fig3]] is available on Canvas (~Lab3-Plant-FRF-2021.mat~).
+Using the data, design a controller $C(s)$ that shapes the loop to satisfy the following requirements.
+Do not use the transfer function $P(s)$ obtained in Question 2.
+Use the measured data directly.
+(Tip: use ~C_frf = squeeze(freqresp(C, freq, 'Hz')~) for the controller frequency response).
+
+#+NAME: fig:fig4
+#+CAPTION: Block diagram of the position control system.
+[[file:fig4.svg]]
+** Answer
+We notice that past about $\SI{12}{\hertz}$, we start to get noise in the gain plot.
+In order to avoid having multiple gain crossovers[fn:final_meas], let's design a PID controller with a loop crossover frequency $\omega_c = \SI{12}{\hertz}$.
+We also need $\phi_m > \SI{60}{\degree}$, so let's try to target the compensator to add $\phi_\text{max} = \SI{70}{\degree}$.
+
+[fn:final_meas] It looks like the final data point was erroneously measured to have incredibly high gain, this will be create an extra zero crossing that will be impossible to remove with a simple first or even second order low pass filter.
+I will ignore the inevitable extra crossover caused by it.
+
+
+
+
+
+First designing our lead compensator:
+#+begin_src matlab :session :results output code :exports both
+omega_c = 12*2*pi; % rad/s
+phi_max = deg2rad(70);  % rad
+alpha = (1 + sin(phi_max))/(1 - sin(phi_max))
+tau = 1/(omega_c*sqrt(alpha))
+G_lead = (alpha*tau*s + 1)/(tau*s + 1)
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+alpha =
+   32.1634
+tau =
+    0.0023
+G_lead =
+ 
+  0.07522 s + 1
+  --------------
+  0.002339 s + 1
+ 
+Continuous-time transfer function.
+#+end_src
+
+Checking that our compensator correctly compensates the loop with a bode plot:
+#+begin_src matlab :session :results file :exports both
+f_name = 'lead_bode.svg';
+fig = figure('visible', 'off',...
+            'Position', [0 0 600 600]);
+opt = bodeoptions;
+opt.Grid = 'on';
+opt.FreqUnits = 'Hz';
+bodeplot(G_lead, freq*(2*pi), opt);
+hold on;
+plot(omega_c/(2*pi), rad2deg(phi_max), 'o');
+hold off;
+saveas(fig, f_name);
+ans = f_name;
+#+end_src
+
+#+RESULTS:
+[[file:lead_bode.svg]]
+
+We can see that the compensator is correctly designed.
+
+Now let's find the proportional gain $K_p$ to shift our loop to have the desired crossover frequency.
+#+begin_src matlab :session :results output code :exports both
+% Extra gain at omega_c
+[gain_lead, ~, ~] = bode(G_lead, omega_c)
+% Current loop gain at omega_c
+gain_loop = interp1(freq*2*pi, mag_meas, omega_c)
+K_p = 1/(gain_lead*gain_loop)
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+gain_lead =
+    5.6713
+gain_loop =
+    0.0070
+K_p =
+   25.0474
+#+end_src
+
+Checking that our compensator correctly moves the loop:
+#+begin_src matlab :session :results output code :exports both
+comp_frf = squeeze(freqresp(K_p*G_lead, freq, 'Hz')).';
+loop1_frf = comp_frf.*P_meas;
+mag_loop1 = abs(loop1_frf);  % abs
+phase_loop1 = unwrap(angle(loop1_frf))*180/pi;  % deg
+% Phase margin at omega_c
+pm_loop1 = interp1(freq*2*pi, phase_loop1, omega_c) + 180
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+pm_loop1 =
+   76.2323
+#+end_src
+
+#+begin_src matlab :session :results file :exports both
+f_name = 'loop1_bode.svg';
+fig = figure('visible', 'off',...
+            'Position', [0 0 600 600]);
+subplot(2, 1, 1);
+loglog(freq, mag_loop1)
+yline(1);
+title('Bode Diagram');
+grid on;
+ylabel('Magnitude [abs]');
+subplot(2, 1, 2);
+semilogx(freq, phase_loop1)
+yline(-120);
+yline(-180);
+ylabel('Phase [deg]');
+xlabel('Frequency [Hz]');
+grid on;
+saveas(fig, f_name);
+ans = f_name;
+#+end_src
+
+#+RESULTS:
+[[file:loop1_bode.svg]]
+
+Implementing an integrator to remove steady state error:
+#+begin_src matlab :session :results output code :exports both
+omega_i = omega_c/10;  % rad/s
+T_i = 1/omega_i;
+% This should have a limited output range when implemented in Simulink
+G_int = 1/(T_i*s)
+G_pi = K_p*(1 + G_int)
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+G_int =
+ 
+     1
+  --------
+  0.1326 s
+ 
+Continuous-time transfer function.
+G_pi =
+ 
+  3.322 s + 25.05
+  ---------------
+     0.1326 s
+ 
+Continuous-time transfer function.
+#+end_src
+
+Implementing a low pass filter to further supress high frequency noise:
+#+begin_src matlab :session :results output code :exports both
+omega_f = omega_c*10;  % rad/s
+G_lpf = 1/(s/omega_f + 1)
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+G_lpf =
+ 
+    754
+  -------
+  s + 754
+ 
+Continuous-time transfer function.
+#+end_src
+
+Let's verify that our loop still meets our requirements:
+#+begin_src matlab :session :results output code :exports both
+cont_frf = squeeze(freqresp(G_pi*G_lead*G_lpf, freq, 'Hz')).';
+loop2_frf = cont_frf.*P_meas;
+mag_loop2 = abs(loop2_frf);  % abs
+phase_loop2 = unwrap(angle(loop2_frf))*180/pi;  % deg
+pm_loop2 = interp1(freq*2*pi, phase_loop2, omega_c) + 180
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+pm_loop2 =
+   64.8082
+#+end_src
+
+#+begin_src matlab :session :results file :exports both
+f_name = 'loop2_bode.svg';
+fig = figure('visible', 'off',...
+            'Position', [0 0 600 600]);
+subplot(2, 1, 1);
+loglog(freq, mag_loop2)
+hold on;
+plot(omega_c/(2*pi), 1, 'o');
+hold off
+yline(1);
+title('Bode Diagram');
+grid on;
+ylim([10^-2, 10^2]);
+ylabel('Magnitude [abs]');
+subplot(2, 1, 2);
+semilogx(freq, phase_loop2)
+hold on;
+plot(omega_c/(2*pi), -180 + pm_loop2 , 'o');
+hold off
+yline(-120);
+ylim([-180, 0]);
+xlim([min(freq), max(freq)]);
+ylabel('Phase [deg]');
+xlabel('Frequency [Hz]');
+grid on;
+saveas(fig, f_name);
+ans = f_name;
+#+end_src
+
+#+RESULTS:
+[[file:loop2_bode.svg]]
+
+We can see that the loop still meets all of our requirements.
+
+Solving for $H$:
+\begin{align*}
+e = 0 &= r - y \\
+r &= y \\
+x_\text{ref} H &= x G_s 0.1 \\
+H &=
+\cancelto{1}{\frac{x}{x_\text{ref}}} G_s 0.1
+\end{align*}
+Plugging in our values:
+#+begin_src matlab :session :results output code :exports both
+H = K_adc*K_lvdt
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+H =
+    0.0035
+#+end_src
+
+* Q5
+Create a Simulink model that implements the modeled plant $P(s)$, controller $C(s)$, and the gain block $H$.
+Use the transfer function $P(s)$ obtained in Question 2, or one that can fit the measured data.
+The controller $C(s)$ can include multiple sub-blocks.
+
+Simulate the step response of the closed-loop system from $x_\text{ref} [\si{\milli\meter}]$ to $x [\si{\milli\meter}]$ and evaluate the performance in terms of rise times and overshoot.
+
+** Answer
+Loading our model:
+#+begin_src matlab :session :results none :exports code
+open_system('G_complete');
+print -dsvg -s 'G_complete.svg';
+#+end_src
+#+begin_src shell :exports results :results file
+inkscape G_complete.svg --export-text-to-path --export-plain-svg -o G_complete_fixed.svg
+printf 'G_complete_fixed.svg'
+#+end_src
+
+#+RESULTS:
+[[file:G_complete_fixed.svg]]
+
+
+Running the simulation:
+#+begin_src matlab :session :results output code :exports both
+out = sim('G_complete', 1);
+t = out.tout;
+x = out.x.Data;
+x_ref = out.x_ref.Data;
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+#+end_src
+
+Calculating the rise time and overshoot:
+#+begin_src matlab :session :results output code :exports both
+t_1 = interp1(x, t, 0.1)  % s
+t_2 = interp1(x, t, 0.9)  % s
+rise_time = t_2 - t_1  % s
+overshoot = (max(x) - 1)*100  % pct
+t_max = interp1(x, t, max(x))  % s
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+t_1 =
+    0.0041
+t_2 =
+    0.0182
+rise_time =
+    0.0141
+overshoot =
+    0.2110
+t_max =
+    0.0428
+#+end_src
+
+Plotting our data:
+#+begin_src matlab :session :results file :exports both
+f_name = 'controlled_step.svg';
+fig = figure('visible', 'off',...
+            'Position', [0 0 600 300]);
+plot(t, x_ref)
+hold on
+plot(t, x)
+plot(t_1, 0.1, 'o');
+plot(t_2, 0.9, 'o');
+plot(t_max, max(x), 'o');
+hold off
+l = legend('Reference', 'Output', '10%', '90%', 'Max');
+set(...
+    l, 'color', 'none', 'edgecolor', 'none',...
+    'Location', 'SouthEast');
+xlim([-0.01, 0.4]);
+ylabel('Position [mm]')
+xlabel('Time [s]')
+saveas(fig, f_name);
+ans = f_name
+#+end_src
+
+#+RESULTS:
+[[file:plant_bode.svg]]
+
+
