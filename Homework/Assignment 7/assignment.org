@@ -1,0 +1,489 @@
+#+TITLE: MECH 421 Assignment 7
+#+AUTHOR: Jasper Chan - 37467164
+
+#+OPTIONS: toc:nil
+
+#+LATEX_HEADER: \definecolor{bg}{rgb}{0.95,0.95,0.95}
+#+LATEX_HEADER: \setminted{frame=single,bgcolor=bg,samepage=true}
+#+LATEX_HEADER: \setlength{\parindent}{0pt}
+#+LATEX_HEADER: \usepackage{float}
+#+LATEX_HEADER: \usepackage{svg}
+#+LATEX_HEADER: \usepackage{cancel}
+#+LATEX_HEADER: \usepackage{amssymb}
+#+LATEX_HEADER: \usepackage{mathtools, nccmath}
+#+LATEX_HEADER: \sisetup{per-mode=fraction}
+#+LATEX_HEADER: \newcommand{\Lwrap}[1]{\left\{#1\right\}}
+#+LATEX_HEADER: \newcommand{\Lagr}[1]{\mathcal{L}\Lwrap{#1}}
+#+LATEX_HEADER: \newcommand{\Lagri}[1]{\mathcal{L}^{-1}\Lwrap{#1}}
+#+LATEX_HEADER: \newcommand{\Ztrans}[1]{\mathcal{Z}\Lwrap{#1}}
+#+LATEX_HEADER: \newcommand{\Ztransi}[1]{\mathcal{Z}^{-1}\Lwrap{#1}}
+#+LATEX_HEADER: \newcommand{\ZOH}[1]{\text{ZOH}\left(#1\right)}
+#+LATEX_HEADER: \DeclarePairedDelimiter{\ceil}{\lceil}{\rceil}
+#+LATEX_HEADER: \makeatletter \AtBeginEnvironment{minted}{\dontdofcolorbox} \def\dontdofcolorbox{\renewcommand\fcolorbox[4][]{##4}} \makeatother
+
+#+LATEX_HEADER: \renewcommand\arraystretch{1.2}
+
+#+begin_src ipython :session :results none :exports none
+import numpy as np
+import pandas as pd
+from matplotlib import pyplot as plt
+from sympy import Symbol
+from IPython.display import set_matplotlib_formats
+%matplotlib inline
+set_matplotlib_formats('svg')
+#+end_src
+#+begin_src ipython :session :results none :exports none
+import IPython
+from tabulate import tabulate
+
+class OrgFormatter(IPython.core.formatters.BaseFormatter):
+    def __call__(self, obj):
+        if(isinstance(obj, str)):
+            return None
+        if(isinstance(obj, pd.core.indexes.base.Index)):
+            return None
+        try:
+            return tabulate(obj, headers='keys',
+                            tablefmt='orgtbl', showindex=False)
+        except:
+            return None
+
+ip = get_ipython()
+ip.display_formatter.formatters['text/org'] = OrgFormatter()
+#+end_src
+
+#+NAME: fig:fig1
+#+CAPTION: Block diagram of a position control system.
+[[file:fig1.svg]]
+
+Figure [[fig:fig1]] shows a block diagram of a position control system.
+Here,
+$G_a(s)$ is the transconductance amplifier,
+$K_f = \SI{1}{\newton\per\ampere}$ is the actuator force constant,
+$G_m(s)$ is the mechanical system, and
+$G_s(s)$ is the sensor.
+The transfer functions and parameters are given as follows.
+\begin{align*}
+G_a(s) &= \frac{1}{s/\omega_a + 1} & \omega_a &= \SI[parse-numbers=false]{2\pi \times 10^3}{\radian\per\second} \\
+G_s(s) &= \frac{1}{s/\omega_s + 1} & \omega_s &= \SI[parse-numbers=false]{10\pi \times 10^3}{\radian\per\second} \\
+G_m(s) &= \frac{1}{ms^2} & m &= \SI{1}{\kilo\gram} \\
+\end{align*}
+
+The controller $C(s)$ is implemented in a real-time computer at a sampling rate $f_s = \SI{10}{\kilo\hertz}$ ($T = \SI{100}{\micro\second}$).
+The real-time computer interfaces with the sensor data via an ADC and with the amplifier via a DAC.
+The ADC generates discrete-time signal $y[k]$ by scaling and sampling the sensor output signal $V_x(t)$ such that
+
+\begin{equation*}
+y[k] = 0.1 V_x(t)|_{t = kT} = 0.1V_x(kT)
+\end{equation*}
+
+The DAC generates the amplifier input signal $V_i(t)$ by scaling and zero-order holding the discrete-time control effort $u[k]$ such that
+
+\begin{align*}
+V_i(t) &= 10 u[k] & \text{for} & kT \le t < kT + T
+\end{align*}
+
+Use MATLAB to answer the following questions.
+
+* Q1
+Draw the Bode plot of the plant
+\begin{equation*}
+P(s) = \frac{V_x(s)}{V_i(s)}
+\end{equation*}
+** Answer
+Defining the plant blocks:
+#+begin_src matlab :session :exports both :results output code
+omega_a = 2*pi*10^3;  % rad/s
+omega_s = 10*pi*10^3;  % rad/s
+m = 1;  % kg
+K_f = 1;  % N/A
+f_s = 10e3;  % Hz
+T = 1/f_s;  % s
+
+s = tf('s');
+G_a = 1/(s/omega_a + 1)  % A/V
+G_m = 1/(m*s^2)  % m/N
+G_s = 1/(s/omega_s + 1)  % m/V
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+G_a =
+ 
+    6283
+  --------
+  s + 6283
+ 
+Continuous-time transfer function.
+G_m =
+ 
+   1
+  ---
+  s^2
+ 
+Continuous-time transfer function.
+G_s =
+ 
+    3.142e04
+  ------------
+  s + 3.142e04
+ 
+Continuous-time transfer function.
+#+end_src
+
+The plant $P(s)$ is then given by:
+#+begin_src matlab :session :exports both :results output code
+P = G_a*K_f*G_m*G_s  % V/V
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+P =
+ 
+              1.974e08
+  --------------------------------
+  s^4 + 3.77e04 s^3 + 1.974e08 s^2
+ 
+Continuous-time transfer function.
+#+end_src
+
+Plotting the Bode plot:
+#+begin_src matlab :session :exports both :results file
+f_name = 'plant_bode.svg';
+fig = figure('visible', 'off',...
+            'Position', [0 0 600 600]);
+bode(P)
+saveas(fig, f_name);
+ans = f_name;
+#+end_src
+
+#+RESULTS:
+[[file:plant_bode.svg]]
+* Q2
+Draw the Bode plot of the plant including the half-sample delay, i.e.,
+\begin{equation*}
+P_\text{delay}(s)
+=
+P(s) e^{-s\frac{T}{2}}
+\end{equation*}
+and the Bode plot of the ZOH equivalent of the plant, i.e.,
+\begin{equation*}
+P_\text{zoh}(z)
+=
+\left(
+1 - z^{-1}
+\right)
+\Ztrans{
+\frac{V_x(s)}{V_i(s)}
+\frac{1}{s}
+}
+\end{equation*}
+in the same figure.
+(Tip: use ~c2d~ command with $T = \SI{100}{\micro\second}$ and ~'zoh'~ option.)
+** Answer
+Creating our plants:
+#+begin_src matlab :session :exports both :results output code
+P_delay = P*exp(-s*T/2)
+P_zoh = c2d(P, T, 'zoh')
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+P_delay =
+ 
+                              1.974e08
+  exp(-5e-05*s) * --------------------------------
+                  s^4 + 3.77e04 s^3 + 1.974e08 s^2
+ 
+Continuous-time transfer function.
+P_zoh =
+ 
+  4.302e-10 z^3 + 2.663e-09 z^2 + 1.324e-09 z + 4.655e-11
+  -------------------------------------------------------
+     z^4 - 2.577 z^3 + 2.176 z^2 - 0.6228 z + 0.02305
+ 
+Sample time: 0.0001 seconds
+Discrete-time transfer function.
+#+end_src
+
+Plotting the Bode plot:
+#+begin_src matlab :session :exports both :results file
+f_name = 'discrete_plant_bode.svg';
+fig = figure('visible', 'off',...
+            'Position', [0 0 600 600]);
+bode(P_delay, 'r-', P_zoh, 'c-.')
+h = findall(gcf, 'type', 'axes');
+l = legend(h(3),'P_{delay}', 'P_{zoh}');
+set(...
+    l, 'color', 'none', 'edgecolor', 'none',...
+    'Interpreter', 'none');
+saveas(fig, f_name);
+ans = f_name;
+#+end_src
+
+#+RESULTS:
+[[file:discrete_plant_bode.svg]]
+
+We can see that the ZOH equivalent closely matches the continuous function up to half the sample rate.
+
+* Q3
+In Homework 6 (b), we designed a continuous-time controller
+\begin{equation*}
+C(s)
+=
+K_p
+\frac{\alpha \tau s + 1}{\tau s + 1}
+\end{equation*}
+for $P_\text{delay}(s)$.
+Find a discrete-time controller $C(z)$ that approximates $C(s)$ via Tustin method, i.e.,
+\begin{equation*}
+C(z)
+=
+K_p
+\left.
+\frac{\alpha \tau s + 1}{\tau s + 1}
+\right|_{s=\frac{2}{T}\frac{z - 1}{z + 1}}
+\end{equation*}
+and draw the Bode plot of $C(s)$ and $C(z)$ in the same figure.
+(Tip: use ~c2d~ command with $T = \SI{100}{\micro\second}$ and ~'tustin'~ option.)
+** Answer
+Copying our controller parameters from the last assignment:
+#+begin_src matlab :session :exports both :results output code
+alpha = 12.7045;
+tau = 4.4652e-04;
+K_p = 1.1133e+05;
+C1 = K_p*(alpha*tau*s + 1)/(tau*s + 1)
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+C1 =
+ 
+  631.6 s + 111330
+  ----------------
+  0.0004465 s + 1
+ 
+Continuous-time transfer function.
+#+end_src
+
+Converting to a discrete controller:
+#+begin_src matlab :session :exports both :results output code
+C1d = c2d(C1, T, 'tustin')
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+C1d =
+ 
+  1.283e06 z - 1.261e06
+  ---------------------
+       z - 0.7986
+ 
+Sample time: 0.0001 seconds
+Discrete-time transfer function.
+#+end_src
+
+Drawing the Bode plot:
+#+begin_src matlab :session :exports both :results file
+f_name = 'cont1_bode.svg';
+fig = figure('visible', 'off',...
+            'Position', [0 0 600 600]);
+bode(C1, 'r-', C1d, 'c-.')
+h = findall(gcf, 'type', 'axes');
+l = legend(h(3),'C(s)', 'C(z)', 'Location', 'NorthWest');
+set(...
+    l, 'color', 'none', 'edgecolor', 'none',...
+    'Interpreter', 'none');
+saveas(fig, f_name);
+ans = f_name;
+#+end_src
+
+#+RESULTS:
+[[file:cont1_bode.svg]]
+
+We can see that the Tustin method approximation closely matches the continuous function up to half the sample rate.
+
+* Q4
+In Homework 6 (d), we designed a continuous-time controller that additionally implements PI control, i.e.,
+\begin{equation*}
+C(s)
+=
+K_p
+\underbrace{
+\left(
+1 + \frac{1}{T_i s}
+\right)
+}_{PI(s)}
+\frac{\alpha \tau s + 1}{\tau s + 1}
+\end{equation*}
+Find a discrete-time transfer function $PI(z)$ that approximates $PI(s)$ via backward rectangular method, i.e.,
+\begin{equation*}
+PI(z) = PI(s)|_{\frac{1}{s} = \frac{T}{1 - z^{-1}}
+\end{equation*}
+Draw the block diagram of $PI(z)$ only in terms of constant gains, summation, and delay block $z^{-1}$.
+Include a saturation block in the block diagram to properly implement anti-windup that limits the state of the discrete time integrator within $\pm 0.5$.
+** Answer
+Copying our controller parameters from the last assignment:
+#+begin_src matlab :session :exports both :results output code
+T_i = 0.01592;  % s
+PI = 1 + 1/(T_i*s);
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+#+end_src
+
+Finding a discrete equivalent:
+#+begin_src matlab :session :exports both :results output code
+z_1 = tf('z', T);
+PId = 1 + T/(T_i*(1 - z^-1))
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+PId =
+ 
+  0.01602 z - 0.01592
+  -------------------
+  0.01592 z - 0.01592
+ 
+Sample time: 0.0001 seconds
+Discrete-time transfer function.
+#+end_src
+
+Checking the Bode plot:
+#+begin_src matlab :session :exports both :results file
+f_name = 'pi_bode.svg';
+fig = figure('visible', 'off',...
+            'Position', [0 0 600 600]);
+bode(PI, 'r-', PId, 'c-.')
+h = findall(gcf, 'type', 'axes');
+l = legend(h(3),'PI(s)', 'PI(z)');
+set(...
+    l, 'color', 'none', 'edgecolor', 'none',...
+    'Interpreter', 'none');
+saveas(fig, f_name);
+ans = f_name;
+#+end_src
+
+#+RESULTS:
+[[file:pi_bode.svg]]
+We can see that the backward rectangular method approximation closely matches the continuous function up to half the sample rate.
+
+
+#+begin_src matlab :session :results none :exports none :eval never-export
+simulink
+#+end_src
+
+For the block diagram, let's first do some algebra:
+\begin{align*}
+PI(z)
+&=
+PI(s)|_{\frac{1}{s} = \frac{T}{1 - z^{-1}}} \\
+&=
+1 + \frac{1}{T_i}
+\left(
+\frac{T}{1 - z^{-1}}
+\right) \\
+&=
+1 + 
+\frac{T}{T_i(1 - z^{-1})} \\
+&=
+\frac
+{T_i(1 - z^{-1}) + T}
+{T_i(1 - z^{-1})} \\
+&=
+\frac
+{(T_i + T) - T_i z^{-1}}
+{T_i - T_i z^{-1}} \\
+&=
+\frac
+{T_i + T}
+{T_i - T_i z^{-1}}
+-
+\frac
+{T_i z^{-1}}
+{T_i - T_i z^{-1}} \\
+&=
+\left(
+1 + \frac{T}{T_i}
+\right)
+\frac
+{1}
+{1 - \underbrace{z^{-1}}_{H}}
+-
+\frac
+{z^{-1}}
+{1 - \underbrace{z^{-1}}_{G}} \\
+\end{align*}
+We can see that each term looks like a feedback loop, where $H$ indicates delay in the feedback path and $G$ indicates delay in the forward path.
+Now creating the block diagram:
+#+begin_src matlab :session :results none :exports code
+% integrator should be limited
+int_lim = 0.5;
+open_system('PI_approx');
+print -dsvg -s 'PI_approx.svg';
+#+end_src
+#+begin_src shell :exports results :results file
+inkscape G_complete.svg --export-text-to-path --export-plain-svg -o G_complete_fixed.svg
+printf 'PI_approx.svg'
+#+end_src
+
+#+RESULTS:
+[[file:PI_approx.svg]]
+
+Let's verify that our block diagram implementation matches what we expect[fn:beforesat].
+#+begin_src matlab :session :results output code :exports both
+% Capture delay blocks in model
+PI_lin_approx = linearize('PI_approx')
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+PI_lin_approx =
+ 
+  A = 
+           Delay1   Delay
+   Delay1       1       0
+   Delay        0       1
+ 
+  B = 
+           Input
+   Delay1      1
+   Delay       1
+ 
+  C = 
+           Delay1   Delay
+   Output   1.006      -1
+ 
+  D = 
+           Input
+   Output  1.006
+ 
+Sample time: 0.0001 seconds
+Discrete-time state-space model.
+#+end_src
+
+Plotting the Bode plot:
+#+begin_src matlab :session :exports both :results file
+f_name = 'pi_approx_bode.svg';
+fig = figure('visible', 'off',...
+            'Position', [0 0 600 600]);
+bode(PId, 'r-', PI_lin_approx, 'c-.')
+h = findall(gcf, 'type', 'axes');
+l = legend(h(3),'PI(z)', 'PI_{simulink}(z)');
+set(...
+    l, 'color', 'none', 'edgecolor', 'none',...
+    'Interpreter', 'none', 'Location', 'North');
+saveas(fig, f_name);
+ans = f_name;
+#+end_src
+
+#+RESULTS:
+[[file:pi_approx_bode.svg]]
+
+We can see that the Simulink model matches the original equation.
+
+
+
+[fn:beforesat] We do the linearization ignoring the saturation block at the output, since that is not captured by the original equation and shouldn't affect our linearization anyways.
