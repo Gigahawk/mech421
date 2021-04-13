@@ -1,0 +1,486 @@
+#+TITLE: MECH 421 Assignment 6
+#+AUTHOR: Jasper Chan - 37467164
+
+#+OPTIONS: toc:nil
+
+#+LATEX_HEADER: \definecolor{bg}{rgb}{0.95,0.95,0.95}
+#+LATEX_HEADER: \setminted{frame=single,bgcolor=bg,samepage=true}
+#+LATEX_HEADER: \setlength{\parindent}{0pt}
+#+LATEX_HEADER: \usepackage{float}
+#+LATEX_HEADER: \usepackage{svg}
+#+LATEX_HEADER: \usepackage{cancel}
+#+LATEX_HEADER: \usepackage{amssymb}
+#+LATEX_HEADER: \usepackage{mathtools, nccmath}
+#+LATEX_HEADER: \sisetup{per-mode=fraction}
+#+LATEX_HEADER: \newcommand{\Lwrap}[1]{\left\{#1\right\}}
+#+LATEX_HEADER: \newcommand{\Lagr}[1]{\mathcal{L}\Lwrap{#1}}
+#+LATEX_HEADER: \newcommand{\Lagri}[1]{\mathcal{L}^{-1}\Lwrap{#1}}
+#+LATEX_HEADER: \newcommand{\Ztrans}[1]{\mathcal{Z}\Lwrap{#1}}
+#+LATEX_HEADER: \newcommand{\Ztransi}[1]{\mathcal{Z}^{-1}\Lwrap{#1}}
+#+LATEX_HEADER: \newcommand{\ZOH}[1]{\text{ZOH}\left(#1\right)}
+#+LATEX_HEADER: \DeclarePairedDelimiter{\ceil}{\lceil}{\rceil}
+#+LATEX_HEADER: \makeatletter \AtBeginEnvironment{minted}{\dontdofcolorbox} \def\dontdofcolorbox{\renewcommand\fcolorbox[4][]{##4}} \makeatother
+
+#+LATEX_HEADER: \renewcommand\arraystretch{1.2}
+
+#+begin_src ipython :session :results none :exports none
+import numpy as np
+import pandas as pd
+from matplotlib import pyplot as plt
+from sympy import Symbol
+from IPython.display import set_matplotlib_formats
+%matplotlib inline
+set_matplotlib_formats('svg')
+#+end_src
+#+begin_src ipython :session :results none :exports none
+import IPython
+from tabulate import tabulate
+
+class OrgFormatter(IPython.core.formatters.BaseFormatter):
+    def __call__(self, obj):
+        if(isinstance(obj, str)):
+            return None
+        if(isinstance(obj, pd.core.indexes.base.Index)):
+            return None
+        try:
+            return tabulate(obj, headers='keys',
+                            tablefmt='orgtbl', showindex=False)
+        except:
+            return None
+
+ip = get_ipython()
+ip.display_formatter.formatters['text/org'] = OrgFormatter()
+#+end_src
+
+#+NAME: fig:fig1
+#+CAPTION: Block diagram of a position control system.
+[[file:fig1.svg]]
+
+Figure [[fig:fig1]] shows a block diagram of a position control system.
+Here,
+$G_a(s)$ is the transconductance amplifier,
+$K_f = \SI{1}{\newton\per\ampere}$ is the actuator force constant,
+$G_m(s)$ is the mechanical system, and
+$G_s(s)$ is the sensor.
+The transfer functions and parameters are given as follows.
+\begin{align*}
+G_a(s) &= \frac{1}{s/\omega_a + 1} & \omega_a &= \SI[parse-numbers=false]{2\pi \times 10^3}{\radian\per\second} \\
+G_s(s) &= \frac{1}{s/\omega_s + 1} & \omega_s &= \SI[parse-numbers=false]{10\pi \times 10^3}{\radian\per\second} \\
+G_m(s) &= \frac{1}{ms^2} & m &= \SI{1}{\kilo\gram} \\
+\end{align*}
+
+The controller $C(s)$ is implemented in a real-time computer at a sampling rate $f_s = \SI{10}{\kilo\hertz}$.
+The real-time computer interfaces with the sensor data via an ADC and with the amplifier via a DAC.
+The ADC has a gain of $\SI{0.1}{count\per\volt}$ and the DAC has a gain of $\SI{10}{\volt\per count}$ with a half-sample delay $e^{-s\frac{T}{2}}$, where $T = 1/f_s = \SI{100}{\micro\second}$.
+Use MATLAB to answer the following questions.
+
+* Preface
+It appears you have made a mistake in marking Homework 4 (2/10 for what I assume should have been 8/10)[fn:lastchecked], please remark it or give a justification for the current mark.
+[fn:lastchecked] As of March 24, 2021.
+* Q1
+Draw the Bode plot of the plant
+\begin{equation*}
+P(s) = \frac{Y(s)}{U(s)}
+\end{equation*}
+** Answer
+Not sure why the question gives so many details about the discrete time implementation of this system, we're being asked to analyze it in the continuous domain.
+Defining the plant blocks:
+#+begin_src matlab :session :exports both :results output code
+omega_a = 2*pi*10^3;  % rad/s
+omega_s = 10*pi*10^3;  % rad/s
+m = 1;  % kg
+K_f = 1;  % N/A
+f_s = 10e3;  % Hz
+T = 1/f_s;  % s
+
+s = tf('s');
+G_dac = 10*exp(-s*T/2)  % V/count
+G_a = 1/(s/omega_a + 1)  % A/V
+G_m = 1/(m*s^2)  % m/N
+G_s = 1/(s/omega_s + 1)  % m/V
+G_adc = 0.1  % count/V
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+G_dac =
+ 
+  exp(-5e-05*s) * (10)
+ 
+Continuous-time transfer function.
+G_a =
+ 
+    6283
+  --------
+  s + 6283
+ 
+Continuous-time transfer function.
+G_m =
+ 
+   1
+  ---
+  s^2
+ 
+Continuous-time transfer function.
+G_s =
+ 
+    3.142e04
+  ------------
+  s + 3.142e04
+ 
+Continuous-time transfer function.
+G_adc =
+    0.1000
+#+end_src
+
+The plant $P(s)$ is then given by:
+#+begin_src matlab :session :exports both :results output code
+P = G_dac*G_a*K_f*G_m*G_s*0.1  % count/count
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+P =
+ 
+                              1.974e08
+  exp(-5e-05*s) * --------------------------------
+                  s^4 + 3.77e04 s^3 + 1.974e08 s^2
+ 
+Continuous-time transfer function.
+#+end_src
+
+Plotting the Bode plot:
+#+begin_src matlab :session :exports both :results file
+f_name = 'plant_bode.svg';
+fig = figure('visible', 'off',...
+            'Position', [0 0 600 600]);
+opt = bodeoptions;
+opt.FreqUnits = 'Hz';
+opt.MagUnits = 'abs';
+opt.MagScale = 'log';
+freq = logspace(0, 4)*2*pi;
+bodeplot(P, freq, opt)
+saveas(fig, f_name);
+ans = f_name;
+#+end_src
+
+#+RESULTS:
+[[file:plant_bode.svg]]
+* Q2
+Design a controller that implements a proportional gain and lead compensator
+\begin{equation*}
+C(s) =
+K_p
+\frac
+{\alpha \tau s + 1}
+{\tau s + 1}
+\end{equation*}
+such that the loop transfer function $L(s) = C(s)P(s)$ achieves the gain crossover $\omega_c = \SI{100}{\hertz}$ with a phase margin $\phi_m > \SI{45}{\degree}$.
+Select the values for $K_p$, $\alpha$, and $\tau$.
+Draw the Bode plot of $L(s)$.
+** Answer
+We need $\phi_m > \SI{45}{\degree}$, so let's target $\phi_m = \SI{50}{\degree}$.
+Figuring out how much phase $\phi_\text{max}$ our compensator needs to add at $\omega_c$:
+#+begin_src matlab :session :exports both :results output code
+omega_c = 100*2*pi; % rad/s
+phi_m = 50;  % deg
+[m_u, p_u] = bode(P, omega_c)  % abs, deg
+phi_max = phi_m - p_u - 180  % deg
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+m_u =
+   2.5200e-06
+p_u =
+ -188.6564
+phi_max =
+   58.6564
+#+end_src
+
+Now finding $\alpha$ and $\tau$ and defining our lead compensator:
+#+begin_src matlab :session :exports both :results output code
+alpha = (1 + sind(phi_max))/(1 - sind(phi_max))
+tau = 1/(sqrt(alpha)*omega_c)
+G_lead = (alpha*tau*s + 1)/(tau*s + 1)
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+alpha =
+   12.7045
+tau =
+   4.4652e-04
+G_lead =
+ 
+  0.005673 s + 1
+  ---------------
+  0.0004465 s + 1
+ 
+Continuous-time transfer function.
+#+end_src
+
+Finding the compensator's inherent gain at $\omega_c$ so that we can find $K_p$:
+#+begin_src matlab :session :exports both :results output code
+[m_lead, ~] = bode(G_lead, omega_c)
+K_p = 1/(m_u*m_lead)
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+m_lead =
+    3.5643
+K_p =
+   1.1133e+05
+#+end_src
+
+#+begin_src matlab :session :exports both :results output code
+C1 = K_p*G_lead;
+L1 = C1*P
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+L1 =
+ 
+                                   1.247e11 s + 2.198e13
+  exp(-5e-05*s) * -------------------------------------------------------
+                  0.0004465 s^5 + 17.83 s^4 + 1.258e05 s^3 + 1.974e08 s^2
+ 
+Continuous-time transfer function.
+#+end_src
+
+Drawing the Bode plot of $L(s)$:
+#+begin_src matlab :session :exports both :results file
+f_name = 'loop1_bode.svg';
+fig = figure('visible', 'off',...
+            'Position', [0 0 600 600]);
+bodeplot(L1, freq, opt)
+saveas(fig, f_name);
+ans = f_name;
+#+end_src
+
+#+RESULTS:
+[[file:loop1_bode.svg]]
+
+Verifying that we met our target margin:
+#+begin_src matlab :session :exports both :results output code
+[~, p_m1, ~, omega_cp1] = margin(L1);
+p_m1  % deg
+f_cp1 = omega_cp1/(2*pi)  % Hz
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+p_m1 =
+   50.0000
+f_cp1 =
+   99.9999
+#+end_src
+
+* Q3
+With $C(s)$ designed in Q2, simulate the step responses of the closed-loop system
+1. from the reference $r$ to position $x$ and
+2. from the disturbance $d$ to position $x$, i.e.,
+\begin{align*}
+G_{xr}(s)
+&=
+\frac{X(s)}{R(s)}
+&
+G_{xd}(s)
+&=
+\frac{X(s)}{D(s)}
+\end{align*}
+** Answer
+Defining our transfer functions: 
+#+begin_src matlab :session :exports both :results output code
+% These are internally represented as large state space matrices,
+% not printing
+G_xr1 = feedback(C1*G_dac*G_a*K_f*G_m, G_s*G_adc);
+% block diagram algebra shows that the feedback should still be negative
+G_xd1 = feedback(G_m, G_s*G_adc*C1*G_dac*G_a*K_f);
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+#+end_src
+
+Plotting the step inputs:
+#+begin_src matlab :session :exports both :results file
+f_name = 'c1_step.svg';
+fig = figure('visible', 'off',...
+            'Position', [0 0 600 600]);
+t_final = 0.03
+subplot(2, 1, 1);
+step(G_xr1, t_final);
+ylabel('Amplitude (G_{xr1})')
+subplot(2, 1, 2);
+step(G_xd1, t_final);
+ylabel('Amplitude (G_{xd1})')
+saveas(fig, f_name);
+ans = f_name;
+#+end_src
+
+#+RESULTS:
+[[file:c1_step.svg]]
+
+We can see that while the disturbance rejection is pretty good (low steady state value of $G_{xd1}$), it doesn't completely decay because we don't have an integral action in the controller.
+
+Finding the performance of each response:
+#+begin_src matlab :session :exports both :results output code
+si_xr1 = stepinfo(G_xr1)
+si_xd1 = stepinfo(G_xd1)
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+si_xr1 = 
+  struct with fields:
+        RiseTime: 0.0016
+    SettlingTime: 0.0142
+     SettlingMin: 9.3213
+     SettlingMax: 12.6077
+       Overshoot: 26.0773
+      Undershoot: 0
+            Peak: 12.6077
+        PeakTime: 0.0044
+si_xd1 = 
+  struct with fields:
+        RiseTime: 0.0084
+    SettlingTime: 0.0157
+     SettlingMin: 8.1070e-06
+     SettlingMax: 8.9819e-06
+       Overshoot: 0
+      Undershoot: 0
+            Peak: 8.9819e-06
+        PeakTime: 0.0432
+#+end_src
+
+
+* Q4
+Design a controller that additionally implements an integral action
+\begin{equation*}
+C(s) =
+K_p
+\left(
+1 + \frac{1}{T_i s}
+\right)
+\frac
+{\alpha \tau s + 1}
+{\tau s + 1}
+\end{equation*}
+such that the loop transfer function $L(s) = C(s)P(s)$ achieves the gain crossover $\omega_c = \SI{100}{\hertz}$ with a phase margin $\phi_m > \SI{40}{\degree}$.
+Use the same values $K_p$, $\alpha$, and $\tau$ from Q2, and select the value of the integral time constant $T_i$.
+Draw the Bode plot of $L(s)$.
+** Answer
+Let's start by picking $\omega_i$ as 1 decade below $\omega_c$:
+#+begin_src matlab :session :exports both :results output code
+omega_i = omega_c/10;  % rad/s
+T_i = 1/omega_i;  % s
+G_int = 1/(T_i*s)
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+G_int =
+ 
+      1
+  ---------
+  0.01592 s
+ 
+Continuous-time transfer function.
+#+end_src
+
+Verifying that our controller still meets our phase margin requirement of $\phi_m > \SI{40}{\degree}$:
+#+begin_src matlab :session :exports both :results output code
+C2 = K_p*(1 + G_int)*G_lead;
+L2 = C2*P
+[~, p_m2, ~, omega_cp2] = margin(L2);
+p_m2  % deg
+f_cp2 = omega_cp2/(2*pi)  % Hz
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+L2 =
+ 
+                          1.984e09 s^2 + 4.744e11 s + 2.198e13
+  exp(-5e-05*s) * ----------------------------------------------------
+                  7.107e-06 s^6 + 0.2838 s^5 + 2003 s^4 + 3.142e06 s^3
+ 
+Continuous-time transfer function.
+p_m2 =
+   44.2765
+f_cp2 =
+  100.4275
+#+end_src
+
+We see that the gain crossing $\omega_c$ has been moved slightly.
+If we wanted to reduce the amount of movement, we could reduce $\omega_i$ further at the cost of slower convergence to zero steady state error in the presence of a step disturbance.
+A better solution would be to adjust $K_p$ to move $\omega_c$ directly where we want it, however because the question specifically asks to use the previously calculated values I will not do that.
+
+
+* Q5
+With $C(s)$ designed in Q4, simulate the step responses of the closed-loop system $G_{xr}(s)$ and $G_{xd}(s)$.
+Compare the results with those from Q3.
+** Answer
+Defining our transfer functions: 
+#+begin_src matlab :session :exports both :results output code
+G_xr2 = feedback(C2*G_dac*G_a*K_f*G_m, G_s*G_adc);
+G_xd2 = feedback(G_m, G_s*G_adc*C2*G_dac*G_a*K_f);
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+#+end_src
+
+Plotting the step inputs:
+#+begin_src matlab :session :exports both :results file
+f_name = 'c2_step.svg';
+fig = figure('visible', 'off',...
+            'Position', [0 0 600 600]);
+t_final = 0.1
+subplot(2, 1, 1);
+step(G_xr2, t_final);
+ylabel('Amplitude (G_{xr2})')
+subplot(2, 1, 2);
+step(G_xd2, t_final);
+ylabel('Amplitude (G_{xd2})')
+saveas(fig, f_name);
+ans = f_name;
+#+end_src
+
+#+RESULTS:
+[[file:c2_step.svg]]
+
+We see that compared to the responses without integral action, we have removed the steady state error caused by a step disturbance, at the cost of a little extra overshoot, which could be removed with some more tuning.
+
+Finding the performance of each response:
+#+begin_src matlab :session :exports both :results output code
+si_xr2 = stepinfo(G_xr2)
+si_xd2 = stepinfo(G_xd2)
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+si_xr2 = 
+  struct with fields:
+        RiseTime: 0.0015
+    SettlingTime: 0.0112
+     SettlingMin: 9.2584
+     SettlingMax: 13.6033
+       Overshoot: 36.0334
+      Undershoot: 0
+            Peak: 13.6033
+        PeakTime: 0.0045
+si_xd2 = 
+  struct with fields:
+        RiseTime: 0
+    SettlingTime: 0.0755
+     SettlingMin: 1.0144e-14
+     SettlingMax: 6.0308e-06
+       Overshoot: Inf
+      Undershoot: 0
+            Peak: 6.0308e-06
+        PeakTime: 0.0078
+#+end_src
