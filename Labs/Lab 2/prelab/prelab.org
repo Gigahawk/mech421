@@ -40,7 +40,7 @@ set_matplotlib_formats('svg')
 
 #+RESULTS:
 :results:
-# Out[1]:
+# Out[3]:
 :end:
 
 #+begin_src ipython :session :results raw drawer :exports none
@@ -67,7 +67,7 @@ ip.display_formatter.formatters['text/org'] = OrgFormatter()
 
 #+RESULTS:
 :results:
-# Out[2]:
+# Out[4]:
 :end:
 
 #+NAME: fig:lab_circuit
@@ -208,13 +208,15 @@ Picking $Z_5 = \SI{2}{\kilo\ohm}$ and $Z_3 = \SI{10}{\kilo\ohm}$ we get a DC gai
 #+begin_src matlab :session :results output code :exports both
 Z_3 = 10e+3;  % ohm
 Z_5 = 2e+3;  % ohm
+Z_3 = 4.7e+3;  % ohm
+Z_5 = 1e+3;  % ohm
 Z_5/Z_3
 #+end_src
 
 #+RESULTS:
 #+begin_src matlab
 ans =
-   200.0000e-003
+   212.7660e-003
 #+end_src
 
 *** Loop Shaping
@@ -295,7 +297,7 @@ R_4_raw = 1/K_c_uncomp
 #+RESULTS:
 #+begin_src matlab
 R_4_raw =
-    56.8816e+003
+    28.4408e+003
 #+end_src
 
 Let's pick $R_4 = \SI{56}{\kilo\ohm}$
@@ -305,8 +307,6 @@ R_4 = 56e3;  % ohm
 
 #+RESULTS:
 #+begin_src matlab
-R_4 =
-    56.0000e+003
 #+end_src
 
 Now we want to set $\omega_i \approx \frac{\omega_c}{10} \approx  \SI{1}{\kilo\hertz}$:
@@ -324,12 +324,11 @@ C_4_raw =
 Let's pick $C_4 = \SI{2700}{\pico\farad}$
 #+begin_src matlab :session :results output code :exports code
 C_4 = 2700e-12;  % F
+C_4 = 4700e-12;  % F
 #+end_src
 
 #+RESULTS:
 #+begin_src matlab
-C_4 =
-     2.7000e-009
 #+end_src
 
 Now we can set up $Z_4$ and our compensated loop:
@@ -363,9 +362,9 @@ dc_gain_db = 20*log10(abs(dc_gain))
 #+RESULTS:
 #+begin_src matlab
 dc_gain =
-  -200.0000e-003
+  -212.7660e-003
 dc_gain_db =
-   -13.9794e+000
+   -13.4420e+000
 #+end_src
 
 The bandwidth of the system is:
@@ -381,9 +380,9 @@ bw_hz = bw/(2*pi)  % Hz
 #+RESULTS:
 #+begin_src matlab
 bw =
-    66.3622e+003
+   129.8183e+003
 bw_hz =
-    10.5619e+003
+    20.6612e+003
 #+end_src
 
 The step response steady state error[fn:floatingpoint]:

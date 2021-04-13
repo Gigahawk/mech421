@@ -1,0 +1,166 @@
+* OP27 SPICE Macro-model
+* Description: Amplifier                                        
+* Generic Desc: 9/30V, BIP, OP, Low Noise, Low Drift, 1X
+* Developed by: JCB / PMI
+* Revision History: 08/10/2012 - Updated to new header style
+* 3.0 (03/2011) - Corrected CMRR, IVR, Bode plot, PSRR, added substrate PNPs, added PSRR
+* 2.0 (12/1990) - Re-ordered subcircuit call out nodes to put the output node last.
+*    		- Changed Ios from 7E-9 to 3.5E-9
+*   		- Added F1 and F2 to fix short circuit current limit
+* Copyright 1990, 2011, 2012 by Analog Devices, Inc.
+*
+* Refer to http://www.analog.com/Analog_Root/static/techSupport/designTools/spiceModels/license/spice_general.html for License Statement. Use of this model
+* indicates your acceptance with the terms and provisions in the License Statement.
+*
+* BEGIN Notes:
+*
+* Not Modeled:
+*
+* Parameters modeled include:
+*
+* END Notes
+*
+* Node assignments
+*                non-inverting input
+*                | inverting input
+*                | | positive supply
+*                | | |  negative supply
+*                | | |  |  output
+*                | | |  |  |
+.SUBCKT OP27     1 2 99 50 39
+*
+* INPUT STAGE & POLE AT 80 MHZ
+*
+R1   6  99    22.00E3
+R2   5  99    22.00E3
+CIN  1   2    4E-12
+C2   5   6    3.1E-14
+IOS  1   2    3.5E-9
+EOS  9   1    POLY(3) (73,98) (22,98) (12,0) 20E-6  1 1 1
+Q1   6  9  8  QX
+Q2   5  2  7  QX
+Q1S 50  6a  9  QS
+Q2S 50  5a  2  QS
+DSH1 6a 6 DSH
+DSH2 5a 5 DSH
+R5   7   4    2.029E-3
+R6   8   4    2.029E-3
+Q21 99  5 211 QEF
+Q22 99  6 212 QEF
+I21 211 50 60E-06
+I22 212 50 60E-06
+I1   4  50   240E-6
+DQ   44  4    DY
+Vlcm 44 50    3.2E0
+D1   2   1    DX
+D2   1   2    DX
+*
+* GAIN STAGE & DOMINANT POLE AT 4.0 HZ
+*
+G1   98 20    211 212  6.05E-04
+R7   20 98     1.545E+07
+C3   20 98     1.20E-09
+V1   121 98     12.1; 25
+D5   20 121     DX
+V2   122 98     -12.4; 25
+D6   122 20     DX
+*
+* POLE - ZERO AT 2.9MHZ / 6MHZ
+*
+G2   98 23     20 98  1
+R8   23 98     1
+R9   23 24     0.935
+C4   24 98     2.4E-12; 09
+*
+* ZERO - POLE AT 6.8MHZ / 40MHZ
+*
+G3   98 25     24 98  1
+R210  25 26     1
+R211  26 98     4.88
+L1   26 98     19.4E-12; 9
+*
+* POLE AT 60 MHZ
+*
+G4   98 27     25 98 1
+R212  27 98     1
+C5   27 98     4.3E-9
+*
+* VOLTAGE NOISE SOURCE WITH FLICKER NOISE
+*
+VN1  11   0   DC 0.8
+DN1  11  12   DEN
+DN2  12  13   DEN
+VN2  0   13   DC 0.8
+*
+* CURRENT NOISE SOURCE WITH FLICKER NOISE
+*
+D60 60 0 DN1 1000
+I60 0 60 1E-3
+D61 61 0 DN4
+I61 0 61 1E-6
+G60 1 0 61 60 2.476E-05
+G61 2 0 61 60 2.476E-05
+D62 62 0 DN3
+I62 0 62 1E-6
+G62 1 2 62 60 3.413E-006
+D63 63 0 DN2
+I63 0 63 1E-6
+*
+* CMRR
+*
+ECM  72 98     POLY(2) (1,98) (2,98)  0  1.125E-02 1.125E-02
+R10  72 73     3.183E+02
+R20  73 98     7.958E-03
+C10  72 73     1.0E-06
+*
+* PSRR
+*
+EPS  98 21 POLY(1) (99,50) -5.6786E+01  1.8929E-00
+RPS1 21 22 3.183E+07
+RPS2 22 98 1.061E+01
+CPS3 21 22 1.000E-09
+*
+R17  33 99     1meg
+R18  33 50     1meg
+EREF  98 0    33  0  1
+GSY  99 50     POLY(1) 99 50 1.669E-3 34.8E-6
+*
+* OUTPUT STAGE
+*
+G7   37 50     27 34  7.143E-3
+G8   38 50     34 27  7.143E-3
+*
+G9   34 99     99 27  7.143E-3
+R19  34 99     140
+G10  50 34     27 50  7.143E-3
+R220  34 50     140
+*
+V3   35 34     1.1
+V4   34 36     1.5
+D9   20 35     DX
+D10  36 20     DX
+D11  99 37     DX
+D12  99 38     DX
+D13  50 37     DY
+D14  50 38     DY
+L3   34 39     1E-7; 39 is output pin
+*
+* MODELS USED
+*
+.MODEL QX  NPN(IS=1E-16, BF=8.0E+3, BR=10)
+.MODEL QEF NPN(BF=1.0E+2)
+.MODEL QS  PNP(IS=1E-11, BF=2.0E+2, RC=1)
+.MODEL DX   D(IS=1E-15)
+.MODEL DY   D(IS=1E-15 BV=50)
+.MODEL DSH  D(IS=1E-9 BV=50); N=1.05 EG=0.59)
+.MODEL DEN  D(IS=1E-12, RS=0.59K, KF=2.85E-16, AF=1)
+.MODEL DIN  D(IS=2E-09, RS=1.8E-05, KF=2.4E-16, AF=1)
+.MODEL DN1 D IS=1E-16
+.MODEL DN2 D IS=1E-16 AF=1 KF=3.086E-017
+.MODEL DN3 D IS=1E-16 AF=1 KF=3.086E-017
+.MODEL DN4 D IS=1E-16 AF=1 KF=5.09E-017
+.MODEL DNOISE D(IS=1E-16,RS=0,KF=3.85E-12)
+*
+.ENDS
+
+

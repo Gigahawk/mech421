@@ -1,0 +1,499 @@
+#+TITLE: MECH 421 Lab 2
+#+AUTHOR: Jasper Chan - 37467164
+
+#+OPTIONS: toc:nil
+
+#+LATEX_HEADER: \definecolor{bg}{rgb}{0.95,0.95,0.95}
+#+LATEX_HEADER: \setminted{frame=single,bgcolor=bg,samepage=true}
+#+LATEX_HEADER: \setlength{\parindent}{0pt}
+#+LATEX_HEADER: \usepackage{float}
+#+LATEX_HEADER: \usepackage{svg}
+#+LATEX_HEADER: \usepackage{cancel}
+#+LATEX_HEADER: \usepackage{amssymb}
+#+LATEX_HEADER: \usepackage{mathtools, nccmath}
+#+LATEX_HEADER: \sisetup{per-mode=fraction}
+#+LATEX_HEADER: \newcommand{\Lwrap}[1]{\left\{#1\right\}}
+#+LATEX_HEADER: \newcommand{\Lagr}[1]{\mathcal{L}\Lwrap{#1}}
+#+LATEX_HEADER: \newcommand{\Lagri}[1]{\mathcal{L}^{-1}\Lwrap{#1}}
+#+LATEX_HEADER: \newcommand{\Ztrans}[1]{\mathcal{Z}\Lwrap{#1}}
+#+LATEX_HEADER: \newcommand{\Ztransi}[1]{\mathcal{Z}^{-1}\Lwrap{#1}}
+#+LATEX_HEADER: \newcommand{\ZOH}[1]{\text{ZOH}\left(#1\right)}
+#+LATEX_HEADER: \DeclarePairedDelimiter{\ceil}{\lceil}{\rceil}
+#+LATEX_HEADER: \makeatletter \AtBeginEnvironment{minted}{\dontdofcolorbox} \def\dontdofcolorbox{\renewcommand\fcolorbox[4][]{##4}} \makeatother
+
+#+LATEX_HEADER: \renewcommand\arraystretch{1.2}
+
+#+begin_src ipython :session :results raw drawer :exports none
+import numpy as np
+import pandas as pd
+import os
+from matplotlib import pyplot as plt
+from sympy import Symbol
+from PySpice.Spice.Netlist import Circuit, SubCircuitFactory
+from PySpice.Spice.Library import SpiceLibrary
+from PySpice.Plot.BodeDiagram import bode_diagram
+from IPython.display import set_matplotlib_formats
+from scipy import signal, optimize
+import shutil
+import tempfile
+%matplotlib inline
+set_matplotlib_formats('svg')
+import PySpice.Logging.Logging as Logging
+logger = Logging.setup_logging(logging_level='DEBUG')
+#+end_src
+
+#+RESULTS:
+:results:
+# Out[35]:
+:end:
+
+#+begin_src ipython :session :results raw drawer :exports none
+# Janky monkeypatch hack
+from PySpice.Spice.NgSpice.Shared import NgSpiceShared
+def exec_command(self, command, join_lines=True):
+
+        """ Execute a command and return the output. """
+
+        if len(command) > self.__MAX_COMMAND_LENGTH__:
+            raise ValueError('Command must not exceed {} characters'.format(self.__MAX_COMMAND_LENGTH__))
+
+        self._logger.debug('Execute command: {}'.format(command))
+        self.clear_output()
+        rc = self._ngspice_shared.ngSpice_Command(command.encode('ascii'))
+        if rc:
+            raise NameError("ngSpice_Command '{}' returned {}".format(command, rc))
+        if join_lines:
+            return self.stdout
+        else:
+            return self._stdout
+NgSpiceShared.exec_command = exec_command
+
+#+end_src
+
+#+RESULTS:
+:results:
+# Out[36]:
+:end:
+
+#+begin_src ipython :session :results raw drawer :exports none
+import IPython
+from tabulate import tabulate
+
+class OrgFormatter(IPython.core.formatters.BaseFormatter):
+    def __call__(self, obj):
+        if(isinstance(obj, list)):
+            return None
+        if(isinstance(obj, str)):
+            return None
+        if(isinstance(obj, pd.core.indexes.base.Index)):
+            return None
+        try:
+            return tabulate(obj, headers='keys',
+                            tablefmt='orgtbl', showindex=False)
+        except:
+            return None
+
+ip = get_ipython()
+ip.display_formatter.formatters['text/org'] = OrgFormatter()
+#+end_src
+
+#+RESULTS:
+:results:
+# Out[2]:
+:end:
+
+#+NAME: fig:lab_circuit
+#+CAPTION: Circuit diagram of lab setup.
+[[file:lab_circuit.svg]]
+
+* Set the impedances $Z_1$ - $Z_5$
+Loading our amplifier implementation from the prelab:
+#+begin_src ipython :session :results output code :exports both
+class PA13Amplifier(SubCircuitFactory):
+    __name__ = 'pa13_amplifier'
+    __nodes__ = ('in+', 'out')
+    def __init__(self, Z_1, Z_2, R_lim=0.2):
+        super().__init__()
+
+        # Supply rails
+        self.V('s+', 'vs+', self.gnd, 25)
+        self.V('s-', self.gnd, 'vs-', 25)
+
+        # PA13
+        self.X('1', 'PA13',
+                'in+', 'in-', 'out',  # Inputs/outputs
+                'vs+', 'vs-',  # Supply rails
+                'cl+', 'cl-',  #  Current limit
+                self.gnd)  # foldover
+
+        # Current limiting resistors
+        self.R('lim+', 'cl+', 'out', R_lim)
+        self.R('lim-', 'cl-', 'out', R_lim)
+
+        # Gain setting resistors
+        self.R('z1', self.gnd, 'in-', Z_1)
+        self.R('z2', 'in-', 'out', Z_2)
+#+end_src
+
+#+RESULTS:
+#+begin_src ipython
+#+end_src
+
+Let's also implement the current controller stage[fn:op27]:
+#+begin_src ipython :session :results output code :exports both
+class OP27Amplifier(SubCircuitFactory):
+    __name__ = 'op27_amplifier'
+    __nodes__ = ('in-', 'out')
+    def __init__(self, R_4, C_4):
+        super().__init__()
+
+        # Supply rails
+        self.V('s+', 'vs+', self.gnd, 25)
+        self.V('s-', self.gnd, 'vs-', 25)
+
+        # OP27
+        self.X('1', 'OP27',
+                self.gnd, 'in-',  # Inputs
+                'vs+', 'vs-',  # Supply rails
+                'out') # Output
+
+        # Gain setting components
+        if R_4 is None:
+            # 4.4 Destabilize the current controller
+            self.C('c4', 'in-', 'out', C_4)
+        else:
+            self.R('r4', 'in-', 'f41', R_4)
+            self.C('c4', 'f41', 'out', C_4)
+#+end_src
+
+#+RESULTS:
+#+begin_src ipython
+#+end_src
+[fn:op27] Using the OP27 SPICE model from https://www.analog.com/media/en/simulation-models/spice-models/op27.cir
+
+* Step response
+** Simulation
+Defining the component values;
+#+begin_src ipython :session :results output code :exports both
+# Values from prelab/schematic
+Z_1 = 2.2*10**3  # ohm
+Z_2 = 22*10**3  # ohm
+Z_3 = 10*10**3  # ohm
+R_4 = 56*10**3  # ohm
+C_4 = 2.7*10**-9 # F
+Z_5 = 2*10**3  # ohm
+R_m = 3  # ohm
+L_m = 1.07*10**-3  # H
+R_s = 0.2  # ohm
+#+end_src
+
+#+RESULTS:
+#+begin_src ipython
+#+end_src
+
+Constructing a circuit with a square wave input:
+#+begin_src ipython :session :results output code :exports both
+def step_resp(vpk_pk):
+    vmax = vpk_pk/2
+    shutil.copyfile('PA13.LIB', '/tmp/PA13.LIB')
+    shutil.copyfile('op27.cir', '/tmp/op27.cir')
+    circuit = Circuit('Step Response')
+    circuit.include('/tmp/PA13.LIB')
+    circuit.include('/tmp/op27.cir')
+    circuit.subcircuit(PA13Amplifier(Z_1, Z_2))
+    circuit.subcircuit(OP27Amplifier(R_4, C_4))
+
+    # V_Ir input
+    circuit.PulseVoltageSource(
+        'input', 'vir', circuit.gnd,
+        -vmax, vmax,
+        pulse_width=0.05,  # 0.05s
+        period=0.1,  # 0.1s, 10Hz
+        rise_time=1e-9, fall_time=1e-9)  # From lab provided schematic
+    circuit.R('r3', 'vir', 'vir2', Z_3)
+    # Current controller stage
+    circuit.X('curr', 'op27_amplifier', 'vir2', 'vr')
+    # Voltage stage
+    circuit.X('volt', 'pa13_amplifier', 'vr', 'vo')
+    # Motor stage
+    circuit.R('rm', 'vo', 'vm1', R_m)
+    circuit.L('lm', 'vm1', 'vio', L_m)
+
+    circuit.R('rs', 'vio', circuit.gnd, R_s)
+    circuit.R('r5', 'vio', 'vir2', Z_5)
+
+    simulator = circuit.simulator()
+    # Force ngspice to have shorter time steps near sharp transitions
+    simulator.options(trtol=0.0001)  
+    analysis = simulator.transient(
+        step_time=0.1,  # Lab schematic suggests 0.1s, this seems too slow
+        end_time=0.045)  # Lab schematic stops at 1s, we only need the first step
+    return analysis
+#+end_src
+
+#+RESULTS:
+#+begin_src ipython
+#+end_src
+
+Let's run the simulation for the specified voltages:
+#+begin_src ipython :session :eval never-export :results raw drawer :exports both
+V_ir = [0.1, 0.2, 0.5, 1.0]  # V
+resp_step = [step_resp(v) for v in V_ir]
+#+end_src
+
+#+RESULTS:
+:results:
+# Out[137]:
+:end:
+
+** Step Response Information
+Calculating the rise time and overshoot:
+#+begin_src ipython :session :eval never-export :results output code :exports both
+def norm_step(t, v, t_f=0.4):
+    v_s = v[0]
+    v_ofst = v - v_s
+    v_f = np.interp(t_f, t, v_ofst)
+    v_norm = v_ofst/v_f
+    return v_norm, v_f
+    
+def step_info(resp):
+    t_f = 0.04  # s, time to reach steady state
+    # Extract data and remove units
+    t = np.array(resp.time.tolist())
+    vir = np.array(resp.nodes['vir'].tolist())
+    vio = np.array(resp.nodes['vio'].tolist())
+
+    vir_norm, vir_f = norm_step(t, vir)
+    vio_norm, vio_f = norm_step(t, vio)
+
+    # Actual gain
+    gain = np.abs(vio_f/vir_f)
+
+    # Overshoot
+    pct_overshoot = (max(vio_norm) - 1)*100
+
+    # Rise time
+    t_rt1 = np.interp(0.1, vio_norm, t)
+    t_rt2 = np.interp(0.9, vio_norm, t)
+    t_rt = t_rt2 - t_rt1
+
+    return t, vio_norm, vir_f, pct_overshoot, t_rt, gain
+
+for r in resp_step:
+    _, _, vir_f, ovsht, t_rt, gain = step_info(r)
+    print(
+        f"V_Ir = {vir_f} V_pkpk, "
+        f"Overshoot: {ovsht:.3e}%, Rise Time: {t_rt:.3e} s, "
+        f"DC gain: {gain:.2f}")
+#+end_src
+
+#+RESULTS:
+#+begin_src ipython
+V_Ir = 0.1 V_pkpk, Overshoot: 4.030e+00%, Rise Time: 3.088e-05 s, DC gain: 0.20
+V_Ir = 0.2 V_pkpk, Overshoot: 4.250e+00%, Rise Time: 3.059e-05 s, DC gain: 0.20
+V_Ir = 0.5 V_pkpk, Overshoot: 5.294e+00%, Rise Time: 3.030e-05 s, DC gain: 0.20
+V_Ir = 1.0 V_pkpk, Overshoot: 1.006e+01%, Rise Time: 4.046e-05 s, DC gain: 0.20
+#+end_src
+
+We can see that the rise times closely matches the value of \SI{3.44e-5}{\second} predicted in the prelab.
+The overshoot is also somewhat comparable to the \SI{3.2}{\percent} predicted in the prelab, at least for low values of $V_{Ir}$.
+Presumably at higher values we start saturating an op-amp or other non-linear qualities become more apparent.  
+
+** Step Response Plots
+Plotting the normalized step response for each input voltage:
+#+begin_src ipython :session :eval never-export :results raw drawer :ipyfile default_step.svg :exports both
+fig, axes = plt.subplots(4, 1, figsize=[6.4, 10])
+for idx, r in enumerate(resp_step):
+    t, vio_norm, vir_f, _, t_rt, _ = step_info(r)
+    ax = axes[idx]
+    ax.plot(t, vio_norm)
+    ax.set_xlim([0, t_rt*15])
+    ax.grid()
+    ax.set_ylabel(
+        f'Normalized output\n$V_{{Ir}}$ = {vir_f} V$_{{pk-pk}}$')
+ax.set_xlabel('Time [s]')
+fig.suptitle('Step Response of Lab Circuit')
+fig.tight_layout()
+
+#+end_src
+
+#+RESULTS:
+:results:
+# Out[227]:
+[[file:default_step.svg]]
+:end:
+
+* Frequency Response
+*** Simulation
+Constructing a circuit with a sinusoidal input:
+#+begin_src ipython :session :results output code :exports both
+omega_h = 6.64*10**4  # rad/s
+f_h = omega_h/(2*np.pi)  # Hz
+def freq_resp():
+    shutil.copyfile('PA13.LIB', '/tmp/PA13.LIB')
+    shutil.copyfile('op27.cir', '/tmp/op27.cir')
+    circuit = Circuit('Freq Response')
+    circuit.include('/tmp/PA13.LIB')
+    circuit.include('/tmp/op27.cir')
+    circuit.subcircuit(PA13Amplifier(Z_1, Z_2))
+    circuit.subcircuit(OP27Amplifier(R_4, C_4))
+
+    # V_Ir input
+    circuit.SinusoidalVoltageSource(
+        'input', 'vir', circuit.gnd, amplitude=0.05)
+    circuit.R('r3', 'vir', 'vir2', Z_3)
+    # Current controller stage
+    circuit.X('curr', 'op27_amplifier', 'vir2', 'vr')
+    # Voltage stage
+    circuit.X('volt', 'pa13_amplifier', 'vr', 'vo')
+    # Motor stage
+    circuit.R('rm', 'vo', 'vm1', R_m)
+    circuit.L('lm', 'vm1', 'vio', L_m)
+
+    circuit.R('rs', 'vio', circuit.gnd, R_s)
+    circuit.R('r5', 'vio', 'vir2', Z_5)
+
+    simulator = circuit.simulator()
+    # Force ngspice to have shorter time steps near sharp transitions
+    simulator.options(trtol=0.0001)  
+    analysis = simulator.ac(
+        start_frequency=50e0,
+        stop_frequency=5*f_h,
+        number_of_points=1000,  # Lab manual suggests 20, might as well do more
+        variation='dec')
+    return analysis
+#+end_src
+
+#+RESULTS:
+#+begin_src ipython
+#+end_src
+
+Running the simulation:
+#+begin_src ipython :session :eval never-export :results raw drawer :exports both
+resp_freq = freq_resp()
+#+end_src
+
+#+RESULTS:
+:results:
+# Out[142]:
+:end:
+
+*** Bandwidth
+Finding the $\SI{-3}{\decibel}$ bandwidth:
+#+begin_src ipython :session :eval never-export :results raw drawer :exports both
+freq = np.array(resp_freq.frequency.tolist())
+vio = np.array(resp_freq.vio.tolist())
+gain = 20*np.log10(np.absolute(vio))
+phase = np.angle(vio, deg=True)
+
+bw = np.interp(-(gain[0] - 3), -gain, freq)
+f"Bandwidth: {bw:.0f} Hz, {bw*2*np.pi:.0f} rad/s"
+#+end_src
+
+#+RESULTS:
+:results:
+# Out[143]:
+: 'Bandwidth: 10355 Hz, 65060 rad/s'
+:end:
+
+We can see that the bandwidth closely matches the prelab value of $\SI{66400}{\radian\per\second}$.
+
+*** Bode Plot
+Plotting the bode plot:
+#+begin_src ipython :session :eval never-export :results raw drawer :exports both
+def bode_plot(f, g, p):
+    figure, ax = plt.subplots(2, figsize=(5, 5), sharex=True)
+    _items = [g, p]
+    _labels = ['Gain [dB]', 'Phase [deg]']
+    for i in range(2):
+        ax[i].semilogx(f, _items[i], base=10)
+        ax[i].grid(True)
+        ax[i].grid(True, which='minor')
+        ax[i].set_ylabel(_labels[i])
+    ax[1].set_xlabel('Frequency [Hz]')
+    return figure, ax
+
+fig, ax = bode_plot(freq, gain, phase)
+ax[0].vlines(bw, min(gain), max(gain), color='r')
+ax[1].vlines(bw, min(phase), max(phase), color='r')
+_ = ax[0].legend(['Response', 'Bandwidth'])
+#+end_src
+
+#+RESULTS:
+:results:
+# Out[145]:
+[[file:./obipy-resources/PfdyoY.svg]]
+:end:
+* Destabilize the current controller
+** Simulation
+Redefining our step response circuit with $R_4$ removed:
+#+begin_src ipython :session :results output code :exports both
+# C_4 needs to be about 0.1 nF to cause system to never converge
+C_4_destab = 0.1*10**-9  # F
+def de_step_resp(vpk_pk):
+    vmax = vpk_pk/2
+    shutil.copyfile('PA13.LIB', '/tmp/PA13.LIB')
+    shutil.copyfile('op27.cir', '/tmp/op27.cir')
+    circuit = Circuit('Step Response')
+    circuit.include('/tmp/PA13.LIB')
+    circuit.include('/tmp/op27.cir')
+    circuit.subcircuit(PA13Amplifier(Z_1, Z_2))
+    circuit.subcircuit(OP27Amplifier(None, C_4_destab))
+
+    # V_Ir input
+    circuit.PulseVoltageSource(
+        'input', 'vir', circuit.gnd,
+        -vmax, vmax,
+        pulse_width=0.05,  # 0.05s
+        period=0.1,  # 0.1s, 10Hz
+        rise_time=1e-9, fall_time=1e-9)  # From lab provided schematic
+    circuit.R('r3', 'vir', 'vir2', Z_3)
+    # Current controller stage
+    circuit.X('curr', 'op27_amplifier', 'vir2', 'vr')
+    # Voltage stage
+    circuit.X('volt', 'pa13_amplifier', 'vr', 'vo')
+    # Motor stage
+    circuit.R('rm', 'vo', 'vm1', R_m)
+    circuit.L('lm', 'vm1', 'vio', L_m)
+
+    circuit.R('rs', 'vio', circuit.gnd, R_s)
+    circuit.R('r5', 'vio', 'vir2', Z_5)
+
+    simulator = circuit.simulator()
+    # Force ngspice to have shorter time steps near sharp transitions
+    simulator.options(trtol=0.0001)  
+    analysis = simulator.transient(
+        step_time=0.1,  # Lab schematic suggests 0.1s, this seems too slow
+        end_time=0.045)  # Lab schematic stops at 1s, we only need the first step
+    return analysis
+#+end_src
+
+#+RESULTS:
+#+begin_src ipython
+#+end_src
+
+Running the simulation:
+#+begin_src ipython :session :eval never-export :results raw drawer :exports both
+resp_de = de_step_resp(0.2)
+#+end_src
+
+** Plot
+Plotting the results to check that our system diverges.
+#+begin_src ipython :session :results raw drawer :ipyfile noload_step.svg :exports both
+t = np.array(resp_de.time.tolist())
+vio = np.array(resp_de.nodes['vio'].tolist())
+plt.plot(t, vio)
+plt.xlabel("Time [s]")
+plt.ylabel("Output $V_{Io}$ [V]")
+_ = plt.title("Destabilized step response")
+#+end_src
+
+#+RESULTS:
+:results:
+# Out[202]:
+[[file:noload_step.svg]]
+:end:
+
+Note that for larger values of $C_4$, the system does not actually go completely unstable, but will significantly oscillate before eventually stabilizing.
+** Analysis
+Intuitively the system becomes unstable because when $Z_4 = \frac{1}{C_4 s}$ there is a pole at $s = 0$ and hence the system goes from being stable to only marginally stable.
