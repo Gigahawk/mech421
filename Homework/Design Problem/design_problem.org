@@ -1,0 +1,449 @@
+#+TITLE: MECH 421 Design Problem
+#+AUTHOR: Jasper Chan - 37467164
+
+#+OPTIONS: toc:nil
+
+#+LATEX_HEADER: \definecolor{bg}{rgb}{0.95,0.95,0.95}
+#+LATEX_HEADER: \setminted{frame=single,bgcolor=bg,samepage=true}
+#+LATEX_HEADER: \setlength{\parindent}{0pt}
+#+LATEX_HEADER: \usepackage{float}
+#+LATEX_HEADER: \usepackage{svg}
+#+LATEX_HEADER: \usepackage{cancel}
+#+LATEX_HEADER: \usepackage{amssymb}
+#+LATEX_HEADER: \usepackage{mathtools, nccmath}
+#+LATEX_HEADER: \sisetup{per-mode=fraction}
+#+LATEX_HEADER: \newcommand{\Lwrap}[1]{\left\{#1\right\}}
+#+LATEX_HEADER: \newcommand{\Lagr}[1]{\mathcal{L}\Lwrap{#1}}
+#+LATEX_HEADER: \newcommand{\Lagri}[1]{\mathcal{L}^{-1}\Lwrap{#1}}
+#+LATEX_HEADER: \newcommand{\Ztrans}[1]{\mathcal{Z}\Lwrap{#1}}
+#+LATEX_HEADER: \newcommand{\Ztransi}[1]{\mathcal{Z}^{-1}\Lwrap{#1}}
+#+LATEX_HEADER: \newcommand{\ZOH}[1]{\text{ZOH}\left(#1\right)}
+#+LATEX_HEADER: \DeclarePairedDelimiter{\ceil}{\lceil}{\rceil}
+#+LATEX_HEADER: \makeatletter \AtBeginEnvironment{minted}{\dontdofcolorbox} \def\dontdofcolorbox{\renewcommand\fcolorbox[4][]{##4}} \makeatother
+
+#+LATEX_HEADER: \renewcommand\arraystretch{1.2}
+
+#+begin_src elisp :session :exports none
+(org-babel-tangle)
+#+end_src
+
+#+RESULTS:
+| k_fit.m | delay_fit.m |
+
+#+begin_src ipython :session :results none :exports none
+import numpy as np
+import pandas as pd
+from matplotlib import pyplot as plt
+from sympy import Symbol
+from IPython.display import set_matplotlib_formats
+%matplotlib inline
+set_matplotlib_formats('svg')
+#+end_src
+#+begin_src ipython :session :results none :exports none
+import IPython
+from tabulate import tabulate
+
+class OrgFormatter(IPython.core.formatters.BaseFormatter):
+    def __call__(self, obj):
+        if(isinstance(obj, str)):
+            return None
+        if(isinstance(obj, pd.core.indexes.base.Index)):
+            return None
+        try:
+            return tabulate(obj, headers='keys',
+                            tablefmt='orgtbl', showindex=False)
+        except:
+            return None
+
+ip = get_ipython()
+ip.display_formatter.formatters['text/org'] = OrgFormatter()
+#+end_src
+
+Figure [[fig:fig3]] shows a simplified block diagram for $x\text{-axis}$ levitation control.
+Here,
+$u [\si{\volt}]$ is the current command signal (control effort) and 
+$y [\si{\volt}]$ is the position sensor output.
+Suppose you do not know the amplifier gain $G_a$, force constant $K_f$, and sensor gain $G_s$.
+Instead, you are given a measured frequency response of the plant shown in Figure [[fig:fig4]].
+Here the blue curves are from the measured data, whereas the red dashed curves are from a parametric model fitting the data.
+The data for Figure [[fig:fig4]] is available on Canvas (~MaglevPlant.mat~).
+Address the following problems to design a stabilizing controller $C(s)$.
+
+#+NAME: fig:fig3
+#+ATTR_LATEX: :width 0.7\textwidth
+#+CAPTION: Simplified block diagram of the $x\text{-axis}$ levitation control.
+[[file:fig3.svg]]
+
+#+NAME: fig:fig4
+#+CAPTION: Experimentally measured frequency response of the plant
+[[file:fig4.svg]]
+
+* Q1
+Find a transfer function $P(s)$ that fits the measured Bode plot of the plant.
+A suggested form for the plant transfer function is
+\begin{equation*}
+P(s)
+=
+\left(
+\frac{K_1}{m s^2 - k} +
+\frac{K_2}{J s^2 + b s + \kappa}
+\right)
+e^{-sT_d}
+\end{equation*}
+which consists of three elements.
+First one in the parentheses captures the typical dynamics of a magnetic levitation system.
+Note tat the sign in front of the stiffness $k$ is negative and makes the system open-loop unstable.
+Such a /negative stiffness/ arises from attractive magnetic forces.
+The second one in the parentheses captures a lightly damped tilting mode dynamics.
+The last one outside the parentheses captures the time delay in the plant.
+If you feel the problem is too challenging, set $K_2 = 0$.
+
+Use $P(s)$ obtained here for the rest of the problems.
+
+** Answer
+First, let's load in our data to MATLAB
+#+begin_src matlab :session :results output code :exports both
+% frf loaded into a variable called `Plant_frf`
+load('MaglevPlant.mat')
+o = Plant_frf(:, 1)*2*pi;  % rad/s
+resp = Plant_frf(:, 2);
+P_meas = frd(resp, o);
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+#+end_src
+
+Let's first define a function to fit $T_d$
+#+begin_src matlab :exports code :tangle delay_fit.m
+function phase = delay_fit(T_d, omega)
+    s = tf('s');
+    P = (1/s^2)*exp(-s*T_d);
+    frf = freqresp(P, omega);
+    phase = squeeze(angle(frf));
+end
+#+end_src
+
+Now let's set an initial guess and fit our data:
+#+begin_src matlab :session :results output code :exports code
+% Initial rough value determined empiracally
+T_d0 = 3/10e3;
+T_dl = 1/10e3;
+T_dh = 9/10e3;
+
+cost = @(T_d) o.*(delay_fit(T_d, o) - squeeze(angle(resp)));
+
+options=optimoptions(...
+    'lsqnonlin',...
+    'StepTolerance',1e-10);
+T_d = lsqnonlin(cost,T_d0,T_dl,T_dh,options);
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+Local minimum possible.
+lsqnonlin stopped because the final change in the sum of squares relative to 
+its initial value is less than the value of the function tolerance.
+#+end_src
+
+Now that we have a value for $T_d$, let's define a function to fit the terms in the brackets.
+#+begin_src matlab :exports code :tangle k_fit.m
+function mag = k_fit(x, omega, T_d)
+    s = tf('s');
+    K_1 = x(1);
+    m = x(2);
+    k = x(3);
+    K_2 = x(4);
+    J = x(5);
+    b = x(6);
+    kappa = x(7);
+    P = (...
+        K_1/(m*s^2 - k)...
+        + K_2/(J*s^2 + b*s + kappa)...
+        )*exp(-s*T_d);
+    frf = freqresp(P, omega);
+    mag = squeeze(abs(frf));
+end
+#+end_src
+
+Now let's set an initial guess and fit our data:
+#+begin_src matlab :session :results output code :exports both
+% Initial rough values determined empiracally
+K_1_0 = 0.35*300^2*0.037;
+m_0 = 0.037;
+k_0 = 300^2*0.037;
+K_2_0 = 100000;
+J_0 = 100;
+b_0 = 1000;
+kappa_0 = 2500^2;
+x_0 = [K_1_0 m_0 k_0 K_2_0 J_0 b_0 kappa_0];
+x_l = x_0*0;
+x_h = x_0*inf;
+
+cost = @(x) o.*(abs(k_fit(x, o, T_d) - squeeze(abs(resp))));
+
+options=optimoptions(...
+    'lsqnonlin',...
+    'StepTolerance',1e-10);
+x = lsqnonlin(cost, x_0, x_l, x_h, options);
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+Local minimum possible.
+lsqnonlin stopped because the final change in the sum of squares relative to 
+its initial value is less than the value of the function tolerance.
+#+end_src
+
+Our fitted values are[fn:fitted]:
+#+begin_src matlab :session :results output code :exports both
+K_1 = x(1)
+m = x(2)
+k = x(3)
+K_2 = x(4)
+J = x(5)
+b = x(6)
+kappa = x(7)
+T_d
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+K_1 =
+   1.2233e+03
+m =
+    0.0203
+k =
+   3.3867e+03
+K_2 =
+   2.5566e+05
+J =
+  412.6781
+b =
+   3.1347e+03
+kappa =
+   2.1187e+07
+T_d =
+   3.1627e-04
+#+end_src
+
+[fn:fitted] Note, the individual values here don't necessarily correlate to any physical parameters, since the fractional terms may have scaled numerators and denominators.
+
+
+
+
+
+Plotting our fitted model against the measured data:
+
+#+begin_src matlab :session :results file :exports both
+f_name = 'bode_plant.svg';
+fig = figure('visible', 'off',...
+            'Position', [0 0 600 600]);
+s = tf('s');
+P = (...
+    K_1/(m*s^2 - k)...
+    + K_2/(J*s^2 + b*s + kappa)...
+    )*exp(-s*T_d);
+opts = bodeoptions('cstprefs');
+opts.PhaseWrapping = 'on';
+bode(P, P_meas, o, opts)
+h = findall(gcf, 'type', 'axes');
+l = legend(h(3),'Fitted', 'Measured');
+set(...
+    l, 'color', 'none', 'edgecolor', 'none',...
+    'Interpreter', 'none');
+saveas(fig, f_name);
+ans = f_name;
+#+end_src
+
+#+RESULTS:
+[[file:bode_plant.svg]]
+
+We see that our fit does a good job of representing the real system.
+
+* Q2
+Draw the pole-zero map of $P(s)$ and check the number of unstable poles.
+What is the frequency of the unstable poles?
+
+** Answer
+Drawing the pole-zero map of $P(s)$:
+#+begin_src matlab :session :results file :exports both
+f_name = 'pzmap_plant.svg';
+fig = figure('visible', 'off',...
+            'Position', [0 0 600 600]);
+pzmap(P);
+fig.Renderer = 'painters';
+saveas(fig, f_name);
+ans = f_name;
+#+end_src
+
+#+RESULTS:
+[[file:pzmap_plant.svg]]
+
+From the plot, we can see that there is one unstable pole.
+
+Finding the frequencies of the unstable poles in our system:
+#+begin_src matlab :session :results output code :exports both
+p = pole(P)
+up = p(real(p) > 0)
+w_up = abs(up)
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+p =
+   1.0e+02 *
+   4.0799 + 0.0000i
+  -4.0799 + 0.0000i
+  -0.0380 + 2.2655i
+  -0.0380 - 2.2655i
+up =
+  407.9864
+w_up =
+  407.9864
+#+end_src
+* Q3
+Design a controller $C(s)$ that satisfies the following requirements.
+- Stabilizing the closed-loop system
+- Phase margin $\phi_m > \SI{30}{\degree}$
+- No integral control
+
+** Answer
+From the requirements and the paper referenced in the assignment, we can infer that our controller should be a lead compensator.
+The design of the controller in the paper appears to leave the loop with multiple zero crossings, but looking at the Bode plot it appears we can completely avoid this by setting crossover frequency $\omega_c \approx \SI{1000}{\radian\per\second}$ with an appropriately high added phase $\phi_\text{max}$.
+Because our model has fairly significant deviations from the measured data around the gain peaks near $\SI{200}{\radian\per\second}$, we will choose $\omega_c = \SI{2000}{\radian\per\second}$ to be safe.
+
+#+begin_src matlab :session :exports both :results output code
+omega_c = 2000;
+phi_max = 80;
+alpha = (1 + sind(phi_max))/(1 - sind(phi_max))
+tau = 1/(sqrt(alpha)*omega_c)
+G_lead = (alpha*tau*s + 1)/(tau*s + 1)
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+alpha =
+  130.6461
+tau =
+   4.3744e-05
+G_lead =
+ 
+  0.005715 s + 1
+  ---------------
+  4.374e-05 s + 1
+ 
+Continuous-time transfer function.
+#+end_src
+
+Finding the appropriate gain $K_p$ to move our zero crossing to the desired point:
+#+begin_src matlab :session :exports both :results output code
+[mag_1, ~] = bode(G_lead*P, omega_c)
+K_p = 1/mag_1
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+mag_1 =
+    0.1667
+K_p =
+    5.9977
+#+end_src
+
+Finding our margins to verify that we meet the requirements:
+#+begin_src matlab :session :exports both :results output code
+[gm, pm, wcg, wcp] = margin(K_p*G_lead*P)
+#+end_src
+
+#+RESULTS:
+#+begin_src matlab
+gm =
+    0.4776
+pm =
+   43.7600
+wcg =
+     0
+wcp =
+   2.0000e+03
+#+end_src
+
+* Q4
+Draw the Bode plot of the loop transfer function $L(s)$ and mark the crossover frequency $\omega_c$ and phase margin $\phi_m$.
+** Answer
+Checking our margins in a Bode plot:
+#+begin_src matlab :session :results file :exports both
+f_name = 'bode_loop.svg';
+fig = figure('visible', 'off',...
+            'Position', [0 0 600 600]);
+h = bodeplot(K_p*G_lead*P, o, opts)
+h.showCharacteristic('MinimumStabilityMargins');
+grid on;
+saveas(fig, f_name);
+ans = f_name;
+#+end_src
+
+#+RESULTS:
+[[file:bode_loop.svg]]
+
+* Q5
+Draw the Nyquist plot of the loop transfer function $L(s)$ and assess the stability of the closed loop system.
+That is,
+calculate $Z = N + \mathcal{P}$, where
+$Z$ is the number of closed-loop unstable poles,
+$N$ is the number of encirclement of the Nyquist plot about $-1$ point, and 
+$\mathcal{P}$ is the number of unstable pole of $L(s)$.
+** Answer
+#+begin_src matlab :session :results file :exports both
+f_name = 'nyquist_loop.svg';
+fig = figure('visible', 'off',...
+            'Position', [0 0 600 600]);
+nyquist(K_p*G_lead*P)
+saveas(fig, f_name);
+ans = f_name;
+#+end_src
+
+#+RESULTS:
+[[file:nyquist_loop.svg]]
+
+The graph shows one counterclockwise encirclement of $-1$, so $N = -1$.
+We also that know $L(s) = K_p G_\text{lead}(s) P(s)$ contains one unstable pole in $P(s)$, therefore $\mathcal{P} = 1$.
+Summing up we get $Z = 0$, and hence the system is stable.
+
+* Q6
+Mark the phase margin $\phi_m$ on the Nyquist plot.
+** Answer
+Showing the phase and gain margins:
+#+begin_src matlab :session :results file :exports both
+f_name = 'nyquist_margins.svg';
+fig = figure('visible', 'off',...
+            'Position', [0 0 600 600]);
+h = nyquistplot(K_p*G_lead*P)
+h.showCharacteristic('MinimumStabilityMargins');
+% Set limits to be identical manually, `axis equal` doesn't work properly
+ylim([-5, 5]);
+xlim([-5, 5]);
+fig.Renderer = 'painters';
+saveas(fig, f_name);
+ans = f_name;
+#+end_src
+#+RESULTS:
+[[file:nyquist_margins.svg]]
+
+* Q7
+Simulate the step response of a closed-loop transfer function from $r$ to $y$
+** Answer
+Constructing our closed loop system and plotting the step response:
+#+begin_src matlab :session :exports both :results output code
+#+end_src
+#+begin_src matlab :session :results file :exports both
+f_name = 'step_cl.svg';
+fig = figure('visible', 'off',...
+            'Position', [0 0 600 300]);
+G_cl = feedback(K_p*G_lead*P, 1);
+step(G_cl);
+saveas(fig, f_name);
+ans = f_name;
+#+end_src
+
+#+RESULTS:
+[[file:step_cl.svg]]
